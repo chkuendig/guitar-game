@@ -44,12 +44,12 @@ export class GameEngine {
   }
 
   /** Start the first round. */
-  start(timeMs = 0): void {
-    this.beginRound(timeMs);
+  start(): void {
+    this.beginRound();
   }
 
   /** New round with a fresh prompt (avoids repeating the same string). */
-  beginRound(timeMs = 0): void {
+  beginRound(): void {
     this.pickTarget();
     this.hold.resetHold();
     this.state = 'listening';

@@ -5,6 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#1c2540" />
     <title>Gitarren-Spiel</title>
+    <script>
+      // ?play = play-test mode: never connect to Vite's HMR socket, so file
+      // edits don't reload the page mid-game. A socket that never opens and
+      // never closes keeps the Vite client idle (a closed one makes it reload).
+      if (/[?&]play\b/.test(location.search)) {
+        const RealWS = window.WebSocket;
+        window.WebSocket = function (url, protocols) {
+          const p = [].concat(protocols || []);
+          if (p.includes('vite-hmr') || p.includes('vite-ping')) {
+            return { readyState: 0, send() {}, close() {}, addEventListener() {}, removeEventListener() {} };
+          }
+          return new RealWS(url, protocols);
+        };
+        window.WebSocket.prototype = RealWS.prototype;
+        Object.assign(window.WebSocket, { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 });
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

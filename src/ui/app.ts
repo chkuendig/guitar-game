@@ -1,5 +1,5 @@
 import { OPEN_STRINGS } from '../strings';
-import { FRAME_SIZE } from '../config';
+import { CLARITY_THRESHOLD, DETECT_MAX_HZ, DETECT_MIN_HZ, FRAME_SIZE } from '../config';
 import { detectPitch } from '../pitch/detect';
 import { rms } from '../pitch/synth';
 import { nearestOpenString } from '../pitch/matcher';
@@ -8,6 +8,7 @@ import type { GameEvent } from '../game/engine';
 import { MicInput } from '../audio/mic';
 import { PluckSynth } from '../audio/pluck';
 import { SimSource } from '../sim';
+import { track } from '../telemetry';
 import { STRINGS } from '../i18n';
 import type { Lang, Strings } from '../i18n';
 
@@ -70,16 +71,16 @@ export class App {
     this.simMode = simRequested;
 
     root.innerHTML = this.template();
-    this.canvas = root.querySelector('#stringsCanvas')!;
+    this.canvas = root.querySelector('#stringsCanvas') as HTMLCanvasElement;
     this.g = this.canvas.getContext('2d')!;
-    this.ringFill = root.querySelector('#ringFill')!;
+    this.ringFill = root.querySelector('#ringFill') as SVGCircleElement;
     this.promptFigurine = root.querySelector('#promptFigurine')!;
     this.promptLabel = root.querySelector('#promptLabel')!;
     this.message = root.querySelector('#message')!;
     this.simBar = root.querySelector('#simBar')!;
     this.startOverlay = root.querySelector('#startOverlay')!;
     this.tuneScreen = root.querySelector('#tuneScreen')!;
-    this.needle = root.querySelector('#needle')!;
+    this.needle = root.querySelector('#needle') as unknown as SVGGElement;
     this.tuneFigurine = root.querySelector('#tuneFigurine')!;
     this.tuneName = root.querySelector('#tuneName')!;
     this.tuneCents = root.querySelector('#tuneCents')!;
@@ -160,10 +161,12 @@ export class App {
   private async start(): Promise<void> {
     if (this.started) return;
     this.started = true;
+    track('start', { sim: this.simMode });
     try {
       this.ctx = new AudioContext();
       await this.ctx.resume();
-    } catch {
+    } catch (err) {
+      track('audio.failed', { error: err instanceof Error ? err.name : String(err) });
       this.ctx = null;
     }
     const sampleRate = this.ctx?.sampleRate ?? 48000;
@@ -171,20 +174,27 @@ export class App {
     this.synth = this.ctx ? new PluckSynth(this.ctx) : null;
 
     if (!this.simMode) {
-      try {
-        this.mic = this.ctx ? await MicInput.create(this.ctx) : null;
-      } catch {
-        this.mic = null;
+      let micError: string | undefined;
+      if (!this.ctx) {
+        micError = 'no-audio-context';
+      } else {
+        try {
+          this.mic = await MicInput.create(this.ctx);
+        } catch (err) {
+          micError = err instanceof Error ? err.name : String(err);
+          this.mic = null;
+        }
       }
       if (!this.mic) {
         this.simMode = true;
         this.message.textContent = this.t.micDenied;
+        track('mic.denied', { error: micError ?? 'unknown' });
       }
     }
     if (this.simMode) this.buildSimBar();
 
     this.startOverlay.classList.add('hidden');
-    this.engine.start(performance.now());
+    this.engine.start();
     requestAnimationFrame((now) => this.loop(now));
   }
 
@@ -202,6 +212,7 @@ export class App {
   }
 
   private pluckSim(index: number): void {
+    track('sim.pluck', { string: index + 1 });
     this.sim?.pluck(index, performance.now());
   }
 
@@ -218,6 +229,7 @@ export class App {
     switch (e.type) {
       case 'round': {
         const s = OPEN_STRINGS[e.target];
+        track('round', { target: e.target, string: s.name });
         this.promptFigurine.textContent = s.figurine;
         this.promptFigurine.style.filter = 'none';
         this.ringFill.style.stroke = s.color;
@@ -237,6 +249,7 @@ export class App {
         break;
       case 'success': {
         const s = OPEN_STRINGS[e.target];
+        track('hold.confirm', { string: e.target, outcome: 'success' });
         const toneMs = this.synth ? this.synth.play(s) : e.toneMs;
         this.engine.notifyPlayback(now, toneMs);
         this.playback = { stringIndex: e.target, startMs: now };
@@ -248,13 +261,14 @@ export class App {
           this.celebration.classList.add('hidden');
           this.celebration.classList.remove('active');
           this.playback = null;
-          this.engine.beginRound(performance.now());
+          this.engine.beginRound();
         }, toneMs + 800);
         break;
       }
       case 'hint': {
         const heard = OPEN_STRINGS[e.heard];
         const target = OPEN_STRINGS[e.target];
+        track('hold.confirm', { string: e.heard, outcome: 'hint', target: e.target });
         this.message.innerHTML =
           `${heard.figurine} ${this.t.hintWas} <b style="color:${heard.color}">` +
           `${this.t.colorNames[heard.index]}</b> — ${this.t.hintTry} ` +
@@ -293,7 +307,11 @@ export class App {
     const sampleRate = useMic ? this.mic!.sampleRate : (this.ctx?.sampleRate ?? 48000);
     const frame = useMic ? this.mic!.readFrame() : this.sim!.currentFrame(now);
     const level = rms(frame);
-    const pitch = detectPitch(frame, sampleRate);
+    const pitch = detectPitch(frame, sampleRate, {
+      minFrequency: DETECT_MIN_HZ,
+      maxFrequency: DETECT_MAX_HZ,
+      clarityThreshold: CLARITY_THRESHOLD,
+    });
 
     if (this.tuneMode) {
       if (pitch) {

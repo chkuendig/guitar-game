@@ -87,7 +87,12 @@ export function detectPitch(
     if (nsdf[tau] > 0) {
       let localMaxAt = -1;
       while (tau <= maxLag && nsdf[tau] > 0) {
-        if (nsdf[tau] >= nsdf[tau - 1] && nsdf[tau] >= nsdf[tau + 1] && nsdf[tau] > nsdf[localMaxAt]) {
+        const right = tau + 1 <= maxLag ? nsdf[tau + 1] : 0;
+        if (
+          nsdf[tau] >= nsdf[tau - 1] &&
+          nsdf[tau] >= right &&
+          (localMaxAt < 0 || nsdf[tau] > nsdf[localMaxAt])
+        ) {
           localMaxAt = tau;
         }
         tau++;

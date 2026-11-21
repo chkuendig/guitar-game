@@ -47,7 +47,7 @@ function rig(target: number): { engine: GameEngine; events: GameEvent[] } {
     return ((target + 1) % 6) / 6;
   };
   const engine = new GameEngine((e) => events.push(e), { rng });
-  engine.start(0);
+  engine.start();
   events.length = 0; // drop the initial round event
   return { engine, events };
 }
@@ -95,7 +95,7 @@ describe('GameEngine', () => {
     events.length = 0;
     engine.notifyPlayback(1300, 1800);
     // Kid (or speaker feedback) "plays" the next target during the ignore window.
-    engine.beginRound(3100);
+    engine.beginRound();
     events.length = 0;
     feedPluck(engine, engine.target, 1400, 1200);
     expect(events.find((e) => e.type === 'success' || e.type === 'hint')).toBeUndefined();
@@ -108,9 +108,9 @@ describe('GameEngine', () => {
     const events: GameEvent[] = [];
     let draw = 0.0; // constant rng: always string 0 -> picker must escape via fallback
     const engine = new GameEngine((e) => events.push(e), { rng: () => draw });
-    engine.start(0);
+    engine.start();
     const first = engine.target;
-    engine.beginRound(100);
+    engine.beginRound();
     const second = engine.target;
     expect(first).toBe(0);
     expect(second).not.toBe(first);
