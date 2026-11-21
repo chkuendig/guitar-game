@@ -1,12 +1,13 @@
 import { OPEN_STRINGS } from '../strings';
-import { CLARITY_THRESHOLD, DETECT_MAX_HZ, DETECT_MIN_HZ, FRAME_SIZE } from '../config';
+import { CLARITY_THRESHOLD, DETECT_MAX_HZ, DETECT_MIN_HZ, FRAME_SIZE, WIDE_MAX_HZ, WIDE_MIN_HZ } from '../config';
 import { detectPitch } from '../pitch/detect';
 import { rms } from '../pitch/synth';
 import { nearestOpenString } from '../pitch/matcher';
-import { GameEngine } from '../game/engine';
+import { GameEngine, TRUMPET } from '../game/engine';
 import type { GameEvent } from '../game/engine';
 import { MicInput } from '../audio/mic';
 import { PluckSynth } from '../audio/pluck';
+import { playFanfare } from '../audio/fanfare';
 import { SimSource } from '../sim';
 import { track } from '../telemetry';
 import { STRINGS } from '../i18n';
@@ -14,6 +15,9 @@ import type { Lang, Strings } from '../i18n';
 
 const ANALYSIS_INTERVAL_MS = 45;
 const RING_CIRCUMFERENCE = 2 * Math.PI * 52;
+// Hidden ?trumpet option.
+const TRUMPET_FIGURINE = '🎺';
+const TRUMPET_COLOR = '#f5b700';
 
 interface VizHeard {
   stringIndex: number | null;
@@ -64,8 +68,16 @@ export class App {
   private lastAnalysisMs = 0;
   private lastFrameMs = 0;
   private roundTimer: number | null = null;
+  private lastPitchTrackMs = 0;
+  private prevLevel = 0;
+  /** Telemetry: frames after a sudden onset — [ms, level, hz, centroidHz]. */
+  private onset: { startMs: number; before: number; frames: [number, number, number | null, number][] } | null = null;
 
-  constructor(root: HTMLElement, lang: Lang, simRequested: boolean) {
+  /** Hidden option (?trumpet): the trumpet is a 7th target. */
+  private readonly trumpetEnabled: boolean;
+
+  constructor(root: HTMLElement, lang: Lang, simRequested: boolean, trumpet = false) {
+    this.trumpetEnabled = trumpet;
     this.root = root;
     this.t = STRINGS[lang];
     this.simMode = simRequested;
@@ -87,7 +99,7 @@ export class App {
     this.celebration = root.querySelector('#celebration')!;
     this.celeFigurine = root.querySelector('#celeFigurine')!;
 
-    this.engine = new GameEngine((e) => this.onEngineEvent(e));
+    this.engine = new GameEngine((e) => this.onEngineEvent(e), { trumpet });
 
     root.querySelector('#startBtn')!.addEventListener('click', () => void this.start());
     root.querySelector('#tuneBtn')!.addEventListener('click', () => this.setTuneMode(true));
@@ -95,8 +107,10 @@ export class App {
 
     window.addEventListener('keydown', (e) => {
       if (!this.simMode || !this.started) return;
-      const index = '123456'.indexOf(e.key);
-      if (index >= 0) this.pluckSim(index);
+      const index = '1234567'.indexOf(e.key);
+      if (index === TRUMPET) {
+        if (this.trumpetEnabled) this.blowSim();
+      } else if (index >= 0) this.pluckSim(index);
     });
 
     this.ringFill.style.strokeDasharray = `${RING_CIRCUMFERENCE}`;
@@ -209,6 +223,19 @@ export class App {
       btn.addEventListener('click', () => this.pluckSim(s.index));
       this.simBar.appendChild(btn);
     }
+    if (this.trumpetEnabled) {
+      const horn = document.createElement('button');
+      horn.className = 'sim-btn';
+      horn.style.setProperty('--string-color', TRUMPET_COLOR);
+      horn.innerHTML = `<span class="sim-fig">${TRUMPET_FIGURINE}</span><span class="sim-name">7</span>`;
+      horn.addEventListener('click', () => this.blowSim());
+      this.simBar.appendChild(horn);
+    }
+  }
+
+  private blowSim(): void {
+    track('sim.blow');
+    this.sim?.blow(performance.now());
   }
 
   private pluckSim(index: number): void {
@@ -228,7 +255,7 @@ export class App {
     const now = performance.now();
     switch (e.type) {
       case 'round': {
-        const s = OPEN_STRINGS[e.target];
+        const s = this.noteInfo(e.target);
         track('round', { target: e.target, string: s.name });
         this.promptFigurine.textContent = s.figurine;
         this.promptFigurine.style.filter = 'none';
@@ -243,16 +270,33 @@ export class App {
         break;
       case 'pitch':
         this.vizHeard = { stringIndex: e.stringIndex, level: e.level, atMs: now };
+        // Throttled sample of what the mic hears, for tuning the detection.
+        if (e.level > 0.002 && now - this.lastPitchTrackMs > 250) {
+          this.lastPitchTrackMs = now;
+          track('pitch', {
+            string: e.stringIndex,
+            cents: e.cents === null ? null : Math.round(e.cents),
+            level: Number(e.level.toFixed(4)),
+            ring: Number(this.ringTarget.toFixed(2)),
+          });
+        }
         break;
       case 'hold':
         this.ringTarget = e.progress;
         break;
       case 'success': {
-        const s = OPEN_STRINGS[e.target];
-        track('hold.confirm', { string: e.target, outcome: 'success' });
-        const toneMs = this.synth ? this.synth.play(s) : e.toneMs;
+        const s = this.noteInfo(e.target);
+        track('hold.confirm', { string: e.target, outcome: 'success', cents: Math.round(e.cents), outOfTune: e.outOfTune });
+        this.message.innerHTML = e.outOfTune ? this.outOfTuneText(e.target, e.cents) : '';
+        let toneMs = e.toneMs;
+        if (e.target === TRUMPET) {
+          if (this.ctx) toneMs = playFanfare(this.ctx);
+          this.playback = null;
+        } else {
+          if (this.synth) toneMs = this.synth.play(OPEN_STRINGS[e.target]);
+          this.playback = { stringIndex: e.target, startMs: now };
+        }
         this.engine.notifyPlayback(now, toneMs);
-        this.playback = { stringIndex: e.target, startMs: now };
         this.celeFigurine.textContent = s.figurine;
         this.celebration.classList.remove('hidden');
         this.celebration.classList.add('active');
@@ -265,19 +309,40 @@ export class App {
         }, toneMs + 800);
         break;
       }
+      case 'harmonic':
+        track('hold.harmonic', { heard: e.heard, target: e.target, cents: Math.round(e.cents) });
+        break;
       case 'hint': {
-        const heard = OPEN_STRINGS[e.heard];
-        const target = OPEN_STRINGS[e.target];
-        track('hold.confirm', { string: e.heard, outcome: 'hint', target: e.target });
+        const heard = this.noteInfo(e.heard);
+        const target = this.noteInfo(e.target);
+        track('hold.confirm', { string: e.heard, outcome: 'hint', target: e.target, cents: Math.round(e.cents), outOfTune: e.outOfTune });
         this.message.innerHTML =
           `${heard.figurine} ${this.t.hintWas} <b style="color:${heard.color}">` +
-          `${this.t.colorNames[heard.index]}</b> — ${this.t.hintTry} ` +
-          `<b style="color:${target.color}">${this.t.colorNames[target.index]}</b> ${target.figurine}`;
+          `${heard.label}</b> — ${this.t.hintTry} ` +
+          `<b style="color:${target.color}">${target.label}</b> ${target.figurine}` +
+          (e.outOfTune ? `<br>${this.outOfTuneText(e.heard, e.cents)}` : '');
         this.clearRoundTimer();
         this.roundTimer = window.setTimeout(() => this.engine.continueRound(), 2400);
         break;
       }
     }
+  }
+
+  /** Figurine, colour and spoken label of a target (a string, or the hidden trumpet). */
+  private noteInfo(index: number): { figurine: string; color: string; label: string; name: string } {
+    if (index === TRUMPET) {
+      return { figurine: TRUMPET_FIGURINE, color: TRUMPET_COLOR, label: this.t.trumpetName, name: 'trumpet' };
+    }
+    const s = OPEN_STRINGS[index];
+    return { figurine: s.figurine, color: s.color, label: this.t.colorNames[index], name: s.name };
+  }
+
+  /** "The red string is really out of tune (too low) — tune it with 🎸". */
+  private outOfTuneText(stringIndex: number, cents: number): string {
+    const s = OPEN_STRINGS[stringIndex];
+    const color = `<b style="color:${s.color}">${this.t.colorNames[stringIndex]}</b>`;
+    const dir = cents < 0 ? this.t.outOfTuneLow : this.t.outOfTuneHigh;
+    return `<span class="out-of-tune">🔧 ${this.t.outOfTune.replace('{color}', color).replace('{dir}', dir)}</span>`;
   }
 
   private clearRoundTimer(): void {
@@ -329,7 +394,42 @@ export class App {
       return;
     }
 
-    this.engine.processFrame(pitch?.frequency ?? null, level, now);
+    // Trumpet option only: wide-range pitch (beyond the guitar band).
+    const wide = this.trumpetEnabled
+      ? detectPitch(frame, sampleRate, {
+          minFrequency: WIDE_MIN_HZ,
+          maxFrequency: WIDE_MAX_HZ,
+          clarityThreshold: CLARITY_THRESHOLD,
+        })
+      : null;
+    this.engine.processFrame(pitch?.frequency ?? null, level, now, wide?.frequency ?? null);
+    this.recordOnset(frame, sampleRate, level, pitch?.frequency ?? null, now);
+  }
+
+  /**
+   * Telemetry only: on a sudden sound (level jumps ≥3× within one frame), log
+   * the next ~400 ms of envelope, pitch and brightness as one 'onset' event —
+   * to tell a knock/drum on the guitar body apart from a plucked string.
+   */
+  private recordOnset(frame: Float32Array, sampleRate: number, level: number, hz: number | null, now: number): void {
+    const prev = this.prevLevel;
+    this.prevLevel = level;
+    if (!this.onset && level > 0.008 && level > 3 * prev) {
+      this.onset = { startMs: now, before: Number(prev.toFixed(4)), frames: [] };
+    }
+    if (!this.onset) return;
+    let diffEnergy = 0;
+    for (let i = 1; i < frame.length; i++) {
+      const d = frame[i] - frame[i - 1];
+      diffEnergy += d * d;
+    }
+    const ratio = Math.sqrt(diffEnergy / (frame.length - 1)) / Math.max(level, 1e-9);
+    const centroidHz = Math.round((sampleRate / Math.PI) * Math.asin(Math.min(1, ratio / 2)));
+    this.onset.frames.push([Math.round(now - this.onset.startMs), Number(level.toFixed(4)), hz === null ? null : Math.round(hz), centroidHz]);
+    if (now - this.onset.startMs >= 400) {
+      track('onset', { before: this.onset.before, frames: this.onset.frames, target: this.engine.target });
+      this.onset = null;
+    }
   }
 
   private drawCanvas(now: number): void {
@@ -354,7 +454,8 @@ export class App {
 
     g.textBaseline = 'middle';
     for (const s of OPEN_STRINGS) {
-      const y = top + gap * s.index;
+      // Lowest string (index 0, low E) at the bottom, highest at the top.
+      const y = top + gap * (OPEN_STRINGS.length - 1 - s.index);
       const isTarget = this.started && !this.tuneMode && s.index === this.engine.target;
       const isHeard = heardLive?.stringIndex === s.index;
       const isPlaying = this.playback?.stringIndex === s.index;

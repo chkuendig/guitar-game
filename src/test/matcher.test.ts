@@ -21,8 +21,16 @@ describe('matcher', () => {
     }
   });
 
+  it('tolerates a badly tuned string (±150 cents) on the right string', () => {
+    for (const cents of [-150, 150]) {
+      const match = matchOpenString(110.0 * Math.pow(2, cents / 1200));
+      expect(match?.stringIndex).toBe(1); // A2
+    }
+  });
+
   it('rejects a pitch between two strings', () => {
-    // Geometric midpoint between E2 (82.41) and A2 (110): 600 cents from both.
+    // Geometric midpoint between E2 (82.41) and A2 (110): 250 cents from both,
+    // beyond the 200-cent tolerance.
     const between = Math.sqrt(82.41 * 110.0);
     expect(matchOpenString(between)).toBeNull();
     // But the nearest string is still reported for tune mode.

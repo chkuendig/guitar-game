@@ -1,5 +1,5 @@
 import { OPEN_STRINGS } from './strings';
-import { synthesizePluck, frameAt } from './pitch/synth';
+import { synthesizeBlow, synthesizePluck, frameAt } from './pitch/synth';
 
 /**
  * Simulation mode: keys 1–6 (or the on-screen picker) produce a synthetic,
@@ -21,6 +21,12 @@ export class SimSource {
 
   pluck(stringIndex: number, nowMs: number): void {
     this.signal = synthesizePluck(OPEN_STRINGS[stringIndex].frequency, this.sampleRate, 1.8);
+    this.startMs = nowMs;
+  }
+
+  /** A sustained trumpet blow (~1.2 s) — hidden ?trumpet option, key 7. */
+  blow(nowMs: number): void {
+    this.signal = synthesizeBlow(530, this.sampleRate, 1.2);
     this.startMs = nowMs;
   }
 

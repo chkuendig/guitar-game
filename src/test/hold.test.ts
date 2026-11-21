@@ -95,21 +95,56 @@ describe('HoldTracker', () => {
   it('never holds a muted pluck below the level floor', () => {
     const tracker = new HoldTracker();
     for (let t = 0; t < 1000; t += STEP) {
-      expect(tracker.push(frame(t, 0, 0.002)).confirmed).toBe(false);
+      expect(tracker.push(frame(t, 0, 0.001)).confirmed).toBe(false); // below GATE_FLOOR_RMS
     }
     expect(tracker.progress).toBe(0);
   });
 
   it('resets when a note decays below its onset-relative gate', () => {
     const tracker = new HoldTracker();
-    // Fast decay: 0.3 -> 0.01 within 400 ms, then silence. Hold is 600 ms,
-    // so it must die before completing.
+    // Very fast decay (a damped/muted pluck): it falls below the level floor
+    // after ~350 ms, before the 400 ms hold completes.
     let confirmed = false;
     for (let t = 0; t < 600; t += STEP) {
-      const level = 0.3 * Math.exp((-t / 1000) * 7.5); // reaches ~1% of onset at 450 ms
+      const level = 0.3 * Math.exp((-t / 1000) * 15);
       if (tracker.push(frame(t, 0, level)).confirmed) confirmed = true;
     }
     expect(confirmed).toBe(false);
     expect(tracker.progress).toBe(0);
+  });
+
+  it('does not confirm a pitch that jitters within the string window (noise, not a note)', () => {
+    const tracker = new HoldTracker({ holdMs: 400 });
+    // Same string index every frame, but cents jumping like the device log
+    // showed (-75, +177, ...): never a steady note.
+    const jitter = [-75, 177, -40, 120, -160, 60, -90, 150, -20, 110, -130, 80];
+    let confirmed = false;
+    jitter.forEach((cents, i) => {
+      if (tracker.push({ timeMs: i * 45, stringIndex: 5, level: 0.05, cents }).confirmed) confirmed = true;
+    });
+    expect(confirmed).toBe(false);
+  });
+
+  it('confirms a steady but badly tuned pitch (−150 cents ± small drift)', () => {
+    const tracker = new HoldTracker({ holdMs: 400 });
+    let confirmed = false;
+    for (let i = 0; i < 14; i++) {
+      const cents = -150 + (i % 3) * 8 - i; // small wobble + slow flat drift
+      if (tracker.push({ timeMs: i * 45, stringIndex: 1, level: 0.05, cents }).confirmed) confirmed = true;
+    }
+    expect(confirmed).toBe(true);
+  });
+
+  it('confirms a quiet, fast-decaying high E like the owner\'s iPhone recorded', () => {
+    // Device telemetry: high E onset ~0.02 RMS, down to ~0.002 within ~500 ms,
+    // pitch steady within a few cents. The old 0.004 floor reset this hold.
+    const tracker = new HoldTracker();
+    let confirmed = false;
+    for (let t = 0; t <= 500; t += STEP) {
+      const level = 0.02 * Math.exp((-t / 1000) * 4.6);
+      const cents = 5 - t / 100; // drifts slightly flat
+      if (tracker.push({ timeMs: t, stringIndex: 5, level, cents }).confirmed) confirmed = true;
+    }
+    expect(confirmed).toBe(true);
   });
 });

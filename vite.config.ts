@@ -11,6 +11,20 @@ function telemetrySink(): Plugin {
     name: 'telemetry-sink',
     apply: 'serve',
     configureServer(server) {
+      // iOS browsers kept serving stale modules despite Vite's `no-cache`
+      // (owner's phone ran old code after a reload, 2026-11-21). Force
+      // `no-store` on every dev response so a reload always fetches fresh code.
+      server.middlewares.use((_req, res, next) => {
+        const setHeader = res.setHeader.bind(res);
+        res.setHeader = (name: string, value: number | string | readonly string[]) => {
+          const key = name.toLowerCase();
+          if (key === 'etag') return res;
+          if (key === 'cache-control') return setHeader(name, 'no-store');
+          return setHeader(name, value);
+        };
+        setHeader('Cache-Control', 'no-store');
+        next();
+      });
       server.middlewares.use('/__telemetry', (req, res) => {
         if (req.method !== 'POST') {
           res.statusCode = 405;

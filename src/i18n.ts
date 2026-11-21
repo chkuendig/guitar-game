@@ -19,8 +19,14 @@ export interface Strings {
   tooHigh: string;
   simHint: string;
   micDenied: string;
+  /** Call-out for a string far from its pitch; {color} and {dir} are filled in. */
+  outOfTune: string;
+  outOfTuneLow: string;
+  outOfTuneHigh: string;
   /** Color names per string index, used in the gentle hint. */
   colorNames: string[];
+  /** Name of the trumpet target in hints (hidden ?trumpet option). */
+  trumpetName: string;
 }
 
 export const STRINGS: Record<Lang, Strings> = {
@@ -39,7 +45,11 @@ export const STRINGS: Record<Lang, Strings> = {
     tooHigh: 'etwas höher',
     simHint: 'Zum Üben: Tasten 1–6',
     micDenied: 'Mikrofon geht nicht 😢 – Übungs-Modus ist an.',
+    outOfTune: 'Die Saite {color} ist stark verstimmt ({dir}) – stimm sie mit 🎸',
+    outOfTuneLow: 'zu tief',
+    outOfTuneHigh: 'zu hoch',
     colorNames: ['rot', 'orange', 'gelb', 'grün', 'blau', 'lila'],
+    trumpetName: 'die Trompete',
   },
   en: {
     title: 'Guitar Game',
@@ -56,7 +66,11 @@ export const STRINGS: Record<Lang, Strings> = {
     tooHigh: 'a bit high',
     simHint: 'Practice: keys 1–6',
     micDenied: 'Microphone unavailable 😢 — practice mode is on.',
+    outOfTune: 'The {color} string is really out of tune ({dir}) — tune it with 🎸',
+    outOfTuneLow: 'too low',
+    outOfTuneHigh: 'too high',
     colorNames: ['red', 'orange', 'yellow', 'green', 'blue', 'purple'],
+    trumpetName: 'the trumpet',
   },
 };
 

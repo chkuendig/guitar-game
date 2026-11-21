@@ -3,6 +3,7 @@ import {
   GATE_FLOOR_RMS,
   GATE_RELATIVE,
   HOLD_MS,
+  STABILITY_CENTS,
 } from '../config';
 
 /**
@@ -14,7 +15,8 @@ import {
  * above max(GATE_FLOOR_RMS, onsetPeak * GATE_RELATIVE). A normally plucked
  * string decays through the whole hold; a muted or dying note falls below the
  * gate and resets the hold. Short pitch dropouts (< DROPOUT_GRACE_MS) pause
- * the hold without resetting it; moving to a different string resets it.
+ * the hold without resetting it; moving to a different string resets it, and
+ * so does a pitch that jumps by more than STABILITY_CENTS within the hold.
  *
  * No DOM, no clocks — the caller supplies frame timestamps, so this is fully
  * unit-testable.
@@ -25,6 +27,7 @@ export interface HoldOptions {
   dropoutGraceMs: number;
   gateRelative: number;
   gateFloorRms: number;
+  stabilityCents: number;
 }
 
 export const DEFAULT_HOLD_OPTIONS: HoldOptions = {
@@ -32,6 +35,7 @@ export const DEFAULT_HOLD_OPTIONS: HoldOptions = {
   dropoutGraceMs: DROPOUT_GRACE_MS,
   gateRelative: GATE_RELATIVE,
   gateFloorRms: GATE_FLOOR_RMS,
+  stabilityCents: STABILITY_CENTS,
 };
 
 export interface HoldFrame {
@@ -40,6 +44,8 @@ export interface HoldFrame {
   stringIndex: number | null;
   /** RMS level of this frame. */
   level: number;
+  /** Cents from the matched string's nominal pitch (enables the stability check). */
+  cents?: number;
 }
 
 export type HoldResult = { confirmed: false } | { confirmed: true; stringIndex: number };
@@ -50,6 +56,8 @@ export class HoldTracker {
   private heldMs = 0;
   private lastValidTimeMs: number | null = null;
   private onsetPeak = 0;
+  /** Running pitch reference of the current hold, in cents. */
+  private refCents: number | null = null;
 
   constructor(options: Partial<HoldOptions> = {}) {
     this.options = { ...DEFAULT_HOLD_OPTIONS, ...options };
@@ -66,7 +74,7 @@ export class HoldTracker {
   }
 
   push(frame: HoldFrame): HoldResult {
-    const { holdMs, dropoutGraceMs, gateRelative, gateFloorRms } = this.options;
+    const { holdMs, dropoutGraceMs, gateRelative, gateFloorRms, stabilityCents } = this.options;
 
     const gate = Math.max(gateFloorRms, this.onsetPeak * gateRelative);
     const levelOk = frame.level > gate;
@@ -85,13 +93,22 @@ export class HoldTracker {
       return { confirmed: false };
     }
 
-    if (frame.stringIndex !== this.holdString) {
-      // Different string (or fresh start): begin a new hold.
+    const unstable =
+      frame.cents !== undefined &&
+      this.refCents !== null &&
+      Math.abs(frame.cents - this.refCents) > stabilityCents;
+    if (frame.stringIndex !== this.holdString || unstable) {
+      // Different string, pitch jumped, or fresh start: begin a new hold.
       this.resetHold();
       this.holdString = frame.stringIndex;
       this.onsetPeak = frame.level;
       this.lastValidTimeMs = frame.timeMs;
+      this.refCents = frame.cents ?? null;
       return { confirmed: false };
+    }
+    if (frame.cents !== undefined) {
+      // Follow slow drift (a decaying string goes slightly flat).
+      this.refCents = this.refCents === null ? frame.cents : 0.7 * this.refCents + 0.3 * frame.cents;
     }
 
     // Same string: accumulate time since the previous valid frame, clamped so
@@ -114,5 +131,6 @@ export class HoldTracker {
     this.heldMs = 0;
     this.lastValidTimeMs = null;
     this.onsetPeak = 0;
+    this.refCents = null;
   }
 }

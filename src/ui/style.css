@@ -131,6 +131,13 @@ body {
   font-size: 22px;
 }
 
+.out-of-tune {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 17px;
+  opacity: 0.9;
+}
+
 .simbar {
   display: flex;
   justify-content: center;

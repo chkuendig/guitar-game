@@ -77,6 +77,39 @@ export function synthesizePluck(frequency: number, sampleRate: number, duration 
   return tone;
 }
 
+/**
+ * A sustained, brassy blow (trumpet, hidden ?trumpet option): bright
+ * harmonics, soft 60 ms attack, steady level with a little vibrato and breath
+ * noise, then a short release. Used by simulation mode (key 7) and tests.
+ */
+export function synthesizeBlow(
+  frequency = 530,
+  sampleRate = 44100,
+  duration = 1.2,
+  amplitude = 0.3,
+): Float32Array {
+  const harmonics = [1, 0.8, 0.7, 0.55, 0.4, 0.3, 0.2, 0.12];
+  const length = Math.round(duration * sampleRate);
+  const out = new Float32Array(length);
+  let rng = 987654321;
+  let phase = 0;
+  for (let i = 0; i < length; i++) {
+    const t = i / sampleRate;
+    const attack = Math.min(1, t / 0.06);
+    const release = Math.min(1, (duration - t) / 0.08);
+    const f = frequency * (1 + 0.004 * Math.sin(2 * Math.PI * 5.5 * t));
+    phase += (2 * Math.PI * f) / sampleRate;
+    let sample = 0;
+    for (let h = 0; h < harmonics.length; h++) sample += harmonics[h] * Math.sin((h + 1) * phase);
+    rng ^= rng << 13;
+    rng ^= rng >>> 17;
+    rng ^= rng << 5;
+    const breath = ((rng >>> 0) / 0xffffffff - 0.5) * 0.05;
+    out[i] = (sample / 3.5 + breath) * amplitude * Math.max(0, Math.min(attack, release));
+  }
+  return out;
+}
+
 /** Slice a sliding analysis window out of a signal, zero-padded at the edges. */
 export function frameAt(signal: Float32Array, start: number, frameSize: number): Float32Array {
   const frame = new Float32Array(frameSize);
