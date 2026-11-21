@@ -40,8 +40,12 @@ Keep modules separate and DOM-free below the UI layer:
 
 ## Commands
 
-- `npm run dev` — vite dev server on 0.0.0.0:5173 (also the Paseo `dev`
-  workspace script; don't start a second one).
+- `npm run dev` — vite dev server on 0.0.0.0:5173. The Paseo `dev`
+  workspace script runs it on fixed port **5191** instead: the owner tests on
+  a phone via https://guitar.kuendig.host (Cloudflare tunnel → paseo:5191;
+  Paseo's own service proxy rejects the HMR websocket). Keep that port in
+  `paseo.json`, and don't start a second dev server.
+- `?play` turns off live reload for that page (for play-testing on a device).
 - `npm test` — vitest unit tests.
 - `npm run build` — `tsc --noEmit` + vite build.
 
@@ -57,7 +61,10 @@ through the same pipeline as the mic. Works headless.
 
 Commits on `main`, small logical steps, author
 `Christian Kündig <christian@kuendig.info>`, trailer
-`Assisted-by: GLM:glm-5.3`. No remote — don't create or push one.
+`Assisted-by: <agent>:<model>`. Remote: `github.com/chkuendig/guitar-game`
+(public). Every push to `main` deploys to GitHub Pages at
+https://guitar.kuendig.io via `.github/workflows/pages.yml` (tests + build
+run on GitHub-hosted runners), so push only with the owner's go-ahead.
 
 ## Host rules (shared machine)
 
