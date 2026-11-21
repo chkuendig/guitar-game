@@ -1,0 +1,68 @@
+/**
+ * All user-facing text lives here. German is the default; English is available
+ * via ?lang=en or an English browser language.
+ */
+export type Lang = 'de' | 'en';
+
+export interface Strings {
+  title: string;
+  start: string;
+  listening: string;
+  success: string;
+  hintWas: string;
+  hintTry: string;
+  tune: string;
+  back: string;
+  tunePrompt: string;
+  inTune: string;
+  tooLow: string;
+  tooHigh: string;
+  simHint: string;
+  micDenied: string;
+  /** Color names per string index, used in the gentle hint. */
+  colorNames: string[];
+}
+
+export const STRINGS: Record<Lang, Strings> = {
+  de: {
+    title: 'Gitarren-Spiel',
+    start: "Los geht's!",
+    listening: 'Lass die Saite klingen …',
+    success: 'Super!',
+    hintWas: 'Das war',
+    hintTry: 'versuch',
+    tune: 'Stimmen',
+    back: 'Zurück',
+    tunePrompt: 'Zupfe eine Saite',
+    inTune: 'perfekt!',
+    tooLow: 'etwas tiefer',
+    tooHigh: 'etwas höher',
+    simHint: 'Zum Üben: Tasten 1–6',
+    micDenied: 'Mikrofon geht nicht 😢 – Übungs-Modus ist an.',
+    colorNames: ['rot', 'orange', 'gelb', 'grün', 'blau', 'lila'],
+  },
+  en: {
+    title: 'Guitar Game',
+    start: "Let's play!",
+    listening: 'Let the string ring …',
+    success: 'Yay!',
+    hintWas: 'That was',
+    hintTry: 'try',
+    tune: 'Tune',
+    back: 'Back',
+    tunePrompt: 'Pluck a string',
+    inTune: 'perfect!',
+    tooLow: 'a bit low',
+    tooHigh: 'a bit high',
+    simHint: 'Practice: keys 1–6',
+    micDenied: 'Microphone unavailable 😢 — practice mode is on.',
+    colorNames: ['red', 'orange', 'yellow', 'green', 'blue', 'purple'],
+  },
+};
+
+export function pickLang(params: URLSearchParams): Lang {
+  const param = params.get('lang');
+  if (param === 'en' || param === 'de') return param;
+  const nav = typeof navigator !== 'undefined' ? navigator.language : 'de';
+  return nav?.toLowerCase().startsWith('en') ? 'en' : 'de';
+}
