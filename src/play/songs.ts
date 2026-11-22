@@ -5,8 +5,11 @@ import { OPEN_STRINGS } from '../strings';
  * syllable; the string and fret to show are derived from the pitch
  * (`positionFor`), so the "number to hold" can never disagree with the melody.
  *
- * All songs are traditional (public domain) and sit in first position on the
- * three highest strings (G, B, high E) with frets 0–3: easy for small hands.
+ * All songs sit in first position with frets 0–3 (easy for small hands),
+ * mostly on the three highest strings (G, B, high E); the pumpkin song also
+ * uses the open D string. Rests are folded into the note before them (the
+ * replay just lets that note ring), so every note is something to pluck.
+ * A melisma (one syllable over two notes) shows "–" on the second note.
  */
 
 export interface SongNote {
@@ -35,7 +38,7 @@ export interface Song {
 export const OPEN_STRING_MIDI = [40, 45, 50, 55, 59, 64] as const;
 
 const NOTE_MIDI: Record<string, number> = {
-  G3: 55, A3: 57, B3: 59, C4: 60, D4: 62, E4: 64, F4: 65, G4: 67,
+  D3: 50, E3: 52, F3: 53, G3: 55, A3: 57, B3: 59, C4: 60, D4: 62, E4: 64, F4: 65, G4: 67,
 };
 
 export function midiToFrequency(midi: number): number {
@@ -94,6 +97,60 @@ export const SONGS: Song[] = [
      E4:schwüm- E4:med E4:uf E4:em D4:See:4
      C4:Chöpf- C4:li C4:i C4:de B3:Was-:2 B3:ser:2
      A3:Schwänz- A3:li A3:i A3:d' G3:Höh:4`,
+  ),
+  // "Oh du goldigs Sünneli" (trad.), from the Chindermusigwält score (in C,
+  // 4/4), transposed down a fourth to G. Lines A B A; "Sün-ne", "Tag" and
+  // "u-se" carry two slurred notes; the rest after "schii-ne" is folded in.
+  song(
+    'sunneli',
+    'Oh du goldigs Sünneli',
+    '☀️',
+    96,
+    `G3:Oh:1.5 B3:du:0.5 D4:gol- G4:digs E4:Sün- G4:ne-:0.5 E4:–:0.5 D4:li:2
+     C4:tue:1.5 D4:doch:0.5 B3:wi- G3:der A3:schii-:2 G3:ne:2
+     D4:Bit- D4:te C4:bliib C4:de B3:ganz D4:Tag:0.5 B3:–:0.5 A3:da:2
+     D4:das D4:mer C4:chönd C4:ve- B3:ru- D4:se:0.5 B3:–:0.5 A3:ga:2
+     G3:Oh:1.5 B3:du:0.5 D4:gol- G4:digs E4:Sün- G4:ne-:0.5 E4:–:0.5 D4:li:2
+     C4:tue:1.5 D4:doch:0.5 B3:wi- G3:der A3:schii-:2 G3:ne:2`,
+  ),
+  // "D'r Hans im Schnokeloch" (Alsatian trad.), 2/4 with an eighth pickup;
+  // ABC (abcnotation) and the liederkiste score, transposed from G down a
+  // fifth to C. Sung form: first line twice. The final "will" is shortened
+  // to complete the pickup bar.
+  song(
+    'hans',
+    "D'r Hans im Schnokeloch",
+    '🐌',
+    100,
+    `G3:D'r:0.5 C4:Hans G4:im E4:Schno-:0.75 D4:ke-:0.25 C4:loch:0.5 C4:hett:0.5
+     D4:al-:0.5 D4:les:0.5 G3:was:0.5 G3:er:0.5 C4:will:1.5
+     G3:D'r:0.5 C4:Hans G4:im E4:Schno-:0.75 D4:ke-:0.25 C4:loch:0.5 C4:hett:0.5
+     D4:al-:0.5 D4:les:0.5 G3:was:0.5 G3:er:0.5 C4:will:1.5
+     E4:un:0.5 D4:was:0.5 E4:er:0.5 F4:hett:0.5 D4:des:0.5
+     E4:will:0.5 F4:er:0.5 G4:nit:0.5 E4:un:0.5
+     D4:was:0.5 E4:er:0.5 F4:will:0.5 D4:des:0.5
+     E4:hett:0.5 F4:er:0.5 G4:nit:0.5 G3:D'r:0.5
+     C4:Hans G4:im E4:Schno-:0.75 D4:ke-:0.25 C4:loch:0.5 C4:hett:0.5
+     D4:al-:0.5 D4:les:0.5 G3:was:0.5 G3:er:0.5 C4:will:1.5`,
+    2,
+  ),
+  // "Did You Ever See a Pumpkin" to the "Did You Ever See a Lassie" tune
+  // (ABC from The Everyday Song Book, 1927), 3/4, in G an octave down so it
+  // fits first position (D3–E4, with the open D string). The rests after
+  // "all" are folded in; "eyes" and "nose" each take two tune notes.
+  song(
+    'pumpkin',
+    'Did You Ever See a Pumpkin',
+    '🎃',
+    120,
+    `G3:Did:0.5 B3:you:0.5 D4:ev-:1.5 E4:er:0.5 D4:see:0.5 C4:a:0.5
+     B3:pump- G3:kin G3:a A3:pump- D3:kin D3:a B3:pump- G3:kin
+     G3:Did:0.5 B3:you:0.5 D4:ev-:1.5 E4:er:0.5 D4:see:0.5 C4:a:0.5
+     B3:pump- G3:kin G3:with A3:no D3:face D3:at G3:all:2
+     G3:With A3:no D3:eyes:2 B3:no G3:nose:2 A3:no D3:mouth D3:and B3:no G3:teeth
+     G3:Did:0.5 B3:you:0.5 D4:ev-:1.5 E4:er:0.5 D4:see:0.5 C4:a:0.5
+     B3:pump- G3:kin G3:with A3:no D3:face D3:at G3:all:2`,
+    3,
   ),
   // "Five Little Ducks" in C, from the owner's KidsPlayMusic tab sheet (first
   // position on the G, B and high E strings). The tab has no rhythm; it

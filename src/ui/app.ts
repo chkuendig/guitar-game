@@ -356,11 +356,13 @@ export class App {
       return;
     }
     track('mode', { mode });
+    const leavingCelebration = this.engine.state === 'celebrate';
     this.mode = mode;
     this.root.querySelectorAll<HTMLButtonElement>('.mode-btn').forEach((btn) =>
       btn.classList.toggle('active', btn.dataset.mode === mode),
     );
     this.clearRoundTimer();
+    this.synth?.stopAll();
     this.celebration.classList.add('hidden');
     this.celebration.classList.remove('active');
     this.playback = null;
@@ -380,8 +382,13 @@ export class App {
       this.songPicker.classList.add('hidden');
     }
     if (mode === 'pluck') {
-      this.showPluckTarget(this.engine.target);
-      this.engine.continueRound();
+      // Left Pluck mid-celebration → that string is done, ask a new one.
+      if (leavingCelebration) {
+        this.engine.beginRound();
+      } else {
+        this.showPluckTarget(this.engine.target);
+        this.engine.continueRound();
+      }
     }
   }
 
@@ -555,7 +562,9 @@ export class App {
   private showSongPicker(): void {
     this.songEngine.stop();
     this.clearRoundTimer();
+    this.synth?.stopAll();
     this.celebration.classList.add('hidden');
+    this.celebration.classList.remove('active');
     this.ringTarget = 0;
     this.message.innerHTML = '';
     this.stage.classList.add('picking');
@@ -642,11 +651,17 @@ export class App {
         this.celebration.classList.add('active');
         // Play the whole melody back as a reward, in the song's rhythm and
         // tempo (input is ignored: the song is done).
+        // Whatever goes wrong with audio, the timer below must still run, or
+        // the screen stays stuck on the celebration.
         const beatSec = 60 / song.bpm;
         let at = 0.15;
         for (const note of song.notes) {
           const lengthSec = note.beats * beatSec;
-          this.synth?.playFrequency(midiToFrequency(note.midi), at, 0.6, lengthSec * 0.95);
+          try {
+            this.synth?.playFrequency(midiToFrequency(note.midi), at, 0.6, lengthSec * 0.95);
+          } catch (err) {
+            track('replay.error', { message: String(err) });
+          }
           at += lengthSec;
         }
         const totalMs = (at + 0.6) * 1000;

@@ -8,6 +8,8 @@ import type { OpenString } from '../strings';
 export class PluckSynth {
   private readonly ctx: AudioContext;
   private readonly cache = new Map<number, AudioBuffer>();
+  /** Sources scheduled or sounding, so a mode switch can silence them. */
+  private readonly live = new Set<{ source: AudioBufferSourceNode; amp: GainNode }>();
 
   constructor(ctx: AudioContext) {
     this.ctx = ctx;
@@ -30,6 +32,10 @@ export class PluckSynth {
     const amp = this.ctx.createGain();
     const start = this.ctx.currentTime + delaySec;
     amp.gain.setValueAtTime(gain, start);
+    source.connect(amp).connect(this.ctx.destination);
+    // start() must come before stop(): Safari throws InvalidStateError
+    // otherwise (that killed the song replay on iOS, 2026-11-22).
+    source.start(start);
     if (lengthSec !== undefined && lengthSec < buffer.duration) {
       // Damp the string at the end of the note, like a player does before
       // the next one, so the rhythm stays crisp.
@@ -37,9 +43,26 @@ export class PluckSynth {
       amp.gain.exponentialRampToValueAtTime(0.001, start + lengthSec + 0.08);
       source.stop(start + lengthSec + 0.1);
     }
-    source.connect(amp).connect(this.ctx.destination);
-    source.start(start);
+    const entry = { source, amp };
+    this.live.add(entry);
+    source.onended = () => this.live.delete(entry);
     return buffer.duration * 1000;
+  }
+
+  /** Silence everything scheduled or ringing (mode switch, leaving a song). */
+  stopAll(): void {
+    const now = this.ctx.currentTime;
+    for (const { source, amp } of this.live) {
+      try {
+        amp.gain.cancelScheduledValues(now);
+        amp.gain.setValueAtTime(amp.gain.value, now);
+        amp.gain.linearRampToValueAtTime(0, now + 0.03);
+        source.stop(now + 0.04);
+      } catch {
+        // already stopped
+      }
+    }
+    this.live.clear();
   }
 
   /** Rendered tones are cached by frequency (rounded to 0.1 Hz). */

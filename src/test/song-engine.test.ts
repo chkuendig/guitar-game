@@ -52,10 +52,11 @@ const tiny = (midis: number[]): Song => ({
 });
 
 describe('songs', () => {
-  it('places every note in first position on the G, B and high E strings', () => {
+  it('places every note in first position (frets 0–3, D string and up)', () => {
     for (const song of SONGS) {
       for (const note of song.notes) {
-        expect(note.string, `${song.id} ${note.syllable}`).toBeGreaterThanOrEqual(3);
+        const min = song.id === 'pumpkin' ? 2 : 3; // only the pumpkin needs the D string
+        expect(note.string, `${song.id} ${note.syllable}`).toBeGreaterThanOrEqual(min);
         expect(note.fret, `${song.id} ${note.syllable}`).toBeLessThanOrEqual(3);
       }
     }
@@ -102,9 +103,42 @@ describe('song data', () => {
       const beats = song.notes.reduce((sum, n) => sum + n.beats, 0);
       expect(beats % song.beatsPerBar, song.id).toBe(0);
     }
+    const total = (id: string) => SONGS.find((s) => s.id === id)!.notes.reduce((t, n) => t + n.beats, 0);
+    expect(total('sunneli')).toBe(48);
+    expect(total('hans')).toBe(32);
+    expect(total('pumpkin')).toBe(48);
     expect(SONGS.find((s) => s.id === 'birthday')!.notes.reduce((t, n) => t + n.beats, 0)).toBe(24);
     expect(SONGS.find((s) => s.id === 'aentli')!.notes.reduce((t, n) => t + n.beats, 0)).toBe(40);
     expect(SONGS.find((s) => s.id === 'ducks')!.notes.reduce((t, n) => t + n.beats, 0)).toBe(32);
+  });
+});
+
+describe('more songs follow their sources', () => {
+  const midis = (id: string) => SONGS.find((s) => s.id === id)!.notes.map((n) => n.midi);
+
+  it('Sünneli: lines A B A of the score, a fourth down (C → G)', () => {
+    const a = [55, 59, 62, 67, 64, 67, 64, 62, 60, 62, 59, 55, 57, 55];
+    const b = [62, 62, 60, 60, 59, 62, 59, 57, 62, 62, 60, 60, 59, 62, 59, 57];
+    expect(midis('sunneli')).toEqual([...a, ...b, ...a]);
+  });
+
+  it("Hans im Schnokeloch: the ABC tune a fifth down (G → C), first line twice", () => {
+    const line = [60, 67, 64, 62, 60, 60, 62, 62, 55, 55, 60];
+    const middle = [64, 62, 64, 65, 62, 64, 65, 67, 64, 62, 64, 65, 62, 64, 65, 67];
+    expect(midis('hans')).toEqual([55, ...line, 55, ...line, ...middle, 55, ...line]);
+    expect(SONGS.find((s) => s.id === 'hans')!.notes).toHaveLength(52); // one per syllable
+  });
+
+  it('Pumpkin: the Lassie tune an octave down, with the open D string', () => {
+    const intro = [55, 59, 62, 64, 62, 60];
+    const ending = [59, 55, 55, 57, 50, 50, 55];
+    expect(midis('pumpkin')).toEqual([
+      ...intro, 59, 55, 55, 57, 50, 50, 59, 55,
+      ...intro, ...ending,
+      55, 57, 50, 59, 55, 57, 50, 50, 59, 55,
+      ...intro, ...ending,
+    ]);
+    expect(positionFor(50)).toEqual({ string: 2, fret: 0 });
   });
 });
 
