@@ -60,6 +60,9 @@ network. New detection/matching behavior gets a unit test there.
 `?sim=1`: keys 1–6 or the on-screen picker produce decaying synthetic plucks
 through the same pipeline as the mic; in Play mode key **N** (or the 🎵 N
 button) plucks the note the song is waiting for. Works headless.
+Sim-only test hooks (no tap needed, for headless screenshots): `&autostart`,
+`&mode=tune|pluck|play`, `&song=aentli|ducks`, `&simdemo` (plucks by itself:
+detuned open strings in Tune/Pluck, the next note in Play).
 
 ## Git
 

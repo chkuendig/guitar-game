@@ -68,10 +68,15 @@ export const WIDE_MAX_HZ = 2000;
 // A note counts after ringing this long — shorter than Pluck mode's HOLD_MS so
 // a song keeps flowing.
 export const PLAY_HOLD_MS = 250;
-// How far (cents) a played note may be from the written pitch. Neighbouring
-// notes in the songs are 100–200 cents apart (B→C is 100), so this stays
-// below the half-way point plus a little slack for an imperfect guitar.
-export const PLAY_TOLERANCE_CENTS = 60;
+// How far (cents) a played note may be from the written pitch. Was 60: on
+// the owner's guitar nothing registered (2026-11-22), most likely because the
+// open G string every song starts on sat further off than that. Neighbouring
+// song notes are 100–200 cents apart, so 90 still rejects the next note on a
+// guitar that is roughly in tune.
+export const PLAY_TOLERANCE_CENTS = 90;
+
+// Tune mode: within this many cents a string counts as in tune (✓).
+export const TUNE_OK_CENTS = 7;
 // Repeated notes (E E E E) need a fresh pluck: after each counted note the
 // level must rise to this multiple of its lowest point since then.
 export const PLAY_ONSET_RATIO = 1.8;

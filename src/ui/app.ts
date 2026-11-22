@@ -1,5 +1,13 @@
 import { OPEN_STRINGS } from '../strings';
-import { CLARITY_THRESHOLD, DETECT_MAX_HZ, DETECT_MIN_HZ, FRAME_SIZE, WIDE_MAX_HZ, WIDE_MIN_HZ } from '../config';
+import {
+  CLARITY_THRESHOLD,
+  DETECT_MAX_HZ,
+  DETECT_MIN_HZ,
+  FRAME_SIZE,
+  TUNE_OK_CENTS,
+  WIDE_MAX_HZ,
+  WIDE_MIN_HZ,
+} from '../config';
 import { detectPitch } from '../pitch/detect';
 import { rms } from '../pitch/synth';
 import { nearestOpenString } from '../pitch/matcher';
@@ -72,6 +80,17 @@ export class App {
   private readonly songStrip: HTMLElement;
   private readonly songPicker: HTMLElement;
   private readonly songsBtn: HTMLElement;
+  private readonly tuneInstr: HTMLElement;
+  private readonly tuneStrings: HTMLElement;
+  /** Tune mode: recent detections, for a steady (median) reading. */
+  private tuneHistory: { string: number; cents: number; atMs: number }[] = [];
+  /** Tune mode: last steady reading per string (cents), shown as ✓ ⬆️ ⬇️. */
+  private readonly tuneState: (number | null)[] = OPEN_STRINGS.map(() => null);
+  private lastTuneSoundMs = 0;
+  /** Play mode: last time the "heard" readout / telemetry was updated. */
+  private lastHeardUiMs = 0;
+  private lastPlayTrackMs = 0;
+  private lastTunedString: number | null = null;
 
   private vizHeard: VizHeard | null = null;
   private playback: VizPlayback | null = null;
@@ -116,6 +135,9 @@ export class App {
     this.songStrip = root.querySelector('#songStrip')!;
     this.songPicker = root.querySelector('#songPicker')!;
     this.songsBtn = root.querySelector('#songsBtn')!;
+    this.tuneInstr = root.querySelector('#tuneInstr')!;
+    this.tuneStrings = root.querySelector('#tuneStrings')!;
+    this.buildTuneStrings();
 
     this.engine = new GameEngine((e) => this.onEngineEvent(e), { trumpet });
     this.songEngine = new SongEngine((e) => this.onSongEvent(e));
@@ -196,7 +218,8 @@ export class App {
             </g>
           </svg>
           <div class="tune-readout"><span id="tuneName">–</span><span id="tuneCents"></span></div>
-          <div class="tune-hint">${this.t.tunePrompt}</div>
+          <div class="tune-instr" id="tuneInstr">${this.t.tunePrompt}</div>
+          <div class="tune-strings" id="tuneStrings"></div>
         </div>
       </section>
       <div class="celebration hidden" id="celebration">
@@ -212,7 +235,9 @@ export class App {
     track('start', { sim: this.simMode });
     try {
       this.ctx = new AudioContext();
-      await this.ctx.resume();
+      // resume() can stay pending without a user gesture (autoplay policy);
+      // don't let that block the game from starting.
+      await Promise.race([this.ctx.resume(), new Promise((r) => setTimeout(r, 500))]);
     } catch (err) {
       track('audio.failed', { error: err instanceof Error ? err.name : String(err) });
       this.ctx = null;
@@ -283,6 +308,28 @@ export class App {
     this.sim?.pluck(index, performance.now());
   }
 
+  /**
+   * Sim-only helpers for headless checks (see main.ts): autostart, open a
+   * mode, and a demo that plucks slightly detuned strings / the next song note.
+   */
+  simTestHooks(params: URLSearchParams): void {
+    if (!params.has('autostart')) return;
+    void this.start().then(() => {
+      const mode = params.get('mode');
+      if (mode === 'tune' || mode === 'pluck' || mode === 'play') this.setMode(mode);
+      const song = SONGS.find((s) => s.id === params.get('song'));
+      if (mode === 'play' && song) this.startSong(song);
+      if (!params.has('simdemo')) return;
+      let i = 0;
+      window.setInterval(() => {
+        if (this.mode === 'play') return this.playNextNoteSim();
+        const s = OPEN_STRINGS[i++ % OPEN_STRINGS.length];
+        const detune = [-35, 0, 25, -12, 40, 3][s.index];
+        this.sim?.pluckFrequency(s.frequency * Math.pow(2, detune / 1200), performance.now());
+      }, 2200);
+    });
+  }
+
   /** Play mode in sim: pluck the note the song is waiting for (key N). */
   private playNextNoteSim(): void {
     const note = this.currentNote();
@@ -338,6 +385,114 @@ export class App {
   }
 
   // ---- Play mode ----------------------------------------------------------
+
+  /** Note name of a frequency, e.g. "G" or "Fis" (German) — for the readout. */
+  private noteName(frequency: number): string {
+    const midi = Math.round(69 + 12 * Math.log2(frequency / 440));
+    return this.t.noteNames[((midi % 12) + 12) % 12];
+  }
+
+  /**
+   * Play mode: "🎧 heard: G ✓" under the strings, so it's obvious the mic
+   * hears something even when it isn't the right note yet. Right string but
+   * clearly off pitch → suggest tuning.
+   */
+  private updateHeardReadout(
+    frequency: number | null,
+    cents: number | null,
+    level: number,
+    onTarget: boolean,
+    now: number,
+  ): void {
+    if (this.songEngine.done) return;
+    if (frequency === null || cents === null || level < 0.003) {
+      if (now - this.lastHeardUiMs > 900) this.message.innerHTML = '';
+      return;
+    }
+    if (now - this.lastHeardUiMs < 150) return;
+    this.lastHeardUiMs = now;
+    const name = this.noteName(frequency);
+    let tail = '';
+    if (onTarget) tail = ' ✓';
+    else if (Math.abs(cents) < 250) tail = ` — ${cents < 0 ? '⬆️' : '⬇️'} ${this.t.playOutOfTune}`;
+    this.message.innerHTML = `<span class="heard">🎧 ${this.t.heard}: <b>${name}</b>${tail}</span>`;
+  }
+
+  // ---- Tune mode ------------------------------------------------------------
+
+  private buildTuneStrings(): void {
+    // High E on top, low E at the bottom — like the strings on the canvas.
+    this.tuneStrings.innerHTML = [...OPEN_STRINGS]
+      .reverse()
+      .map(
+        (s) =>
+          `<div class="ts-row" data-s="${s.index}" style="--c:${s.color}">` +
+          `<span class="ts-fig">${s.figurine}</span>` +
+          `<span class="ts-name">${s.name}</span>` +
+          `<span class="ts-bar"><i></i></span>` +
+          `<span class="ts-status">–</span></div>`,
+      )
+      .join('');
+  }
+
+  /**
+   * Tune mode: nearest open string with a steady (median) reading over the
+   * last ~400 ms, an up/down instruction, and a ✓ ⬆️ ⬇️ status per string
+   * that stays put while the child moves on to the next string.
+   */
+  private updateTuner(frequency: number | null, level: number, now: number): void {
+    if (frequency !== null && level > 0.003) {
+      const match = nearestOpenString(frequency);
+      this.tuneHistory.push({ string: match.stringIndex, cents: match.cents, atMs: now });
+      this.lastTuneSoundMs = now;
+    }
+    this.tuneHistory = this.tuneHistory.filter((h) => now - h.atMs < 400);
+    if (this.tuneHistory.length === 0) {
+      if (now - this.lastTuneSoundMs > 1500) {
+        this.tuneInstr.textContent = this.t.tunePrompt;
+        this.tuneInstr.className = 'tune-instr';
+        this.tuneStrings.querySelectorAll('.ts-row').forEach((r) => r.classList.remove('active'));
+      }
+      return;
+    }
+    const string = this.tuneHistory[this.tuneHistory.length - 1].string;
+    const readings = this.tuneHistory.filter((h) => h.string === string).map((h) => h.cents);
+    if (readings.length < 3) return;
+    readings.sort((a, b) => a - b);
+    const cents = readings[readings.length >> 1];
+    this.tuneState[string] = cents;
+
+    const s = OPEN_STRINGS[string];
+    const rounded = Math.round(cents);
+    this.tuneFigurine.textContent = s.figurine;
+    this.tuneName.textContent = s.name;
+    this.tuneName.style.color = s.color;
+    this.tuneCents.textContent = `${rounded > 0 ? '+' : ''}${rounded}`;
+    const angle = Math.max(-50, Math.min(50, cents)) * 1.8;
+    this.needle.setAttribute('transform', `rotate(${angle} 150 140)`);
+
+    const ok = Math.abs(cents) <= TUNE_OK_CENTS;
+    this.tuneInstr.className = `tune-instr ${ok ? 'ok' : cents < 0 ? 'up' : 'down'}`;
+    this.tuneInstr.innerHTML = ok
+      ? `✓ ${s.figurine} ${this.t.inTune}`
+      : `<span class="arrow">${cents < 0 ? '⬆️' : '⬇️'}</span> ${s.figurine} ${cents < 0 ? this.t.tuneUp : this.t.tuneDown}`;
+
+    this.tuneStrings.querySelectorAll<HTMLElement>('.ts-row').forEach((row) => {
+      const i = Number(row.dataset.s);
+      row.classList.toggle('active', i === string);
+      const c = this.tuneState[i];
+      if (c === null) return;
+      const okRow = Math.abs(c) <= TUNE_OK_CENTS;
+      row.querySelector('.ts-status')!.textContent = okRow ? '✓' : c < 0 ? '⬆️' : '⬇️';
+      row.classList.toggle('ok', okRow);
+      const pos = 50 + Math.max(-50, Math.min(50, c));
+      row.querySelector<HTMLElement>('.ts-bar i')!.style.left = `${pos}%`;
+    });
+    if (string !== this.lastTunedString) {
+      this.lastTunedString = string;
+      track('tune.string', { string, cents: rounded });
+    }
+  }
 
   private buildSongPicker(): void {
     this.songPicker.innerHTML = `<h2>${this.t.pickSong}</h2>`;
@@ -413,6 +568,18 @@ export class App {
       case 'heard': {
         const note = this.currentNote();
         this.vizHeard = { stringIndex: e.onTarget && note ? note.string : null, level: e.level, atMs: now };
+        this.updateHeardReadout(e.frequency, e.cents, e.level, e.onTarget, now);
+        if (note && e.level > 0.003 && now - this.lastPlayTrackMs > 250) {
+          this.lastPlayTrackMs = now;
+          track('play.heard', {
+            index: this.songEngine.index,
+            target: note.midi,
+            hz: e.frequency === null ? null : Math.round(e.frequency * 10) / 10,
+            cents: e.cents === null ? null : Math.round(e.cents),
+            level: Number(e.level.toFixed(4)),
+            ring: Number(this.ringTarget.toFixed(2)),
+          });
+        }
         break;
       }
       case 'done': {
@@ -574,18 +741,7 @@ export class App {
     });
 
     if (this.mode === 'tune') {
-      if (pitch) {
-        const match = nearestOpenString(pitch.frequency);
-        const s = OPEN_STRINGS[match.stringIndex];
-        this.tuneFigurine.textContent = s.figurine;
-        this.tuneName.textContent = s.name;
-        this.tuneName.style.color = s.color;
-        const cents = Math.round(match.cents);
-        this.tuneCents.textContent =
-          Math.abs(cents) <= 5 ? this.t.inTune : `${cents > 0 ? '+' : ''}${cents}`;
-        const angle = Math.max(-50, Math.min(50, match.cents)) * 1.8;
-        this.needle.setAttribute('transform', `rotate(${angle} 150 140)`);
-      }
+      this.updateTuner(pitch?.frequency ?? null, level, now);
       return;
     }
 

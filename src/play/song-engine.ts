@@ -21,8 +21,11 @@ export type SongEvent =
   | { type: 'note'; index: number }
   /** Hold progress 0..1 for the current note's ring. */
   | { type: 'hold'; progress: number }
-  /** Live data for the visualizer: is the current note sounding? */
-  | { type: 'heard'; onTarget: boolean; level: number }
+  /**
+   * Live data for the visualizer and the "heard" readout: the detected pitch
+   * and its distance (cents) from the note the song is waiting for.
+   */
+  | { type: 'heard'; onTarget: boolean; level: number; frequency: number | null; cents: number | null }
   /** Whole song played. */
   | { type: 'done' };
 
@@ -69,7 +72,7 @@ export class SongEngine {
     const target = song.notes[this.index];
     const cents = frequency === null ? null : 1200 * Math.log2(frequency / midiToFrequency(target.midi));
     const onTarget = cents !== null && Math.abs(cents) <= PLAY_TOLERANCE_CENTS;
-    this.emit({ type: 'heard', onTarget, level });
+    this.emit({ type: 'heard', onTarget, level, frequency, cents });
 
     if (!this.armed) {
       this.minSinceNote = Math.min(this.minSinceNote, level);

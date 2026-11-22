@@ -39,6 +39,15 @@ export interface Strings {
   songDone: string;
   songs: string;
   simPlayHint: string;
+  /** Tune mode instructions for the plucked string. */
+  tuneUp: string;
+  tuneDown: string;
+  /** Play mode live readout: "heard: G". */
+  heard: string;
+  /** Play mode: right string, but clearly out of tune. */
+  playOutOfTune: string;
+  /** Note names C … B (German uses H for B). */
+  noteNames: string[];
 }
 
 export const STRINGS: Record<Lang, Strings> = {
@@ -72,6 +81,11 @@ export const STRINGS: Record<Lang, Strings> = {
     songDone: 'Bravo, das ganze Lied! 🎉',
     songs: 'Lieder',
     simPlayHint: 'Taste N = nächster Ton',
+    tuneUp: 'zu tief – Wirbel anziehen',
+    tuneDown: 'zu hoch – Wirbel lockern',
+    heard: 'gehört',
+    playOutOfTune: 'klingt verstimmt – erst stimmen 🎚️',
+    noteNames: ['C', 'Cis', 'D', 'Dis', 'E', 'F', 'Fis', 'G', 'Gis', 'A', 'B', 'H'],
   },
   en: {
     title: 'Guitar TPP',
@@ -103,6 +117,11 @@ export const STRINGS: Record<Lang, Strings> = {
     songDone: 'You played the whole song! 🎉',
     songs: 'Songs',
     simPlayHint: 'Key N = next note',
+    tuneUp: 'too low — tighten the peg',
+    tuneDown: 'too high — loosen the peg',
+    heard: 'heard',
+    playOutOfTune: 'sounds out of tune — tune first 🎚️',
+    noteNames: ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'B♭', 'B'],
   },
 };
 
