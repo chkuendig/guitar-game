@@ -122,11 +122,12 @@ describe('more songs follow their sources', () => {
     expect(midis('sunneli')).toEqual([...a, ...b, ...a]);
   });
 
-  it("Hans im Schnokeloch: the ABC tune a fifth down (G → C), first line twice", () => {
-    const line = [60, 67, 64, 62, 60, 60, 62, 62, 55, 55, 60];
+  it('Hansdampf im Schnäggeloch: the ABC tune a fifth down (G → C), first line twice', () => {
+    // "Hans-dampf" splits the tune's first quarter (C) into two eighths.
+    const line = [60, 60, 67, 64, 62, 60, 60, 62, 62, 55, 55, 60];
     const middle = [64, 62, 64, 65, 62, 64, 65, 67, 64, 62, 64, 65, 62, 64, 65, 67];
     expect(midis('hans')).toEqual([55, ...line, 55, ...line, ...middle, 55, ...line]);
-    expect(SONGS.find((s) => s.id === 'hans')!.notes).toHaveLength(52); // one per syllable
+    expect(SONGS.find((s) => s.id === 'hans')!.notes).toHaveLength(55); // one per syllable
   });
 
   it('Pumpkin: the Lassie tune an octave down, with the open D string', () => {

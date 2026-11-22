@@ -113,24 +113,25 @@ export const SONGS: Song[] = [
      G3:Oh:1.5 B3:du:0.5 D4:gol- G4:digs E4:Sün- G4:ne-:0.5 E4:–:0.5 D4:li:2
      C4:tue:1.5 D4:doch:0.5 B3:wi- G3:der A3:schii-:2 G3:ne:2`,
   ),
-  // "D'r Hans im Schnokeloch" (Alsatian trad.), 2/4 with an eighth pickup;
-  // ABC (abcnotation) and the liederkiste score, transposed from G down a
-  // fifth to C. Sung form: first line twice. The final "will" is shortened
-  // to complete the pickup bar.
+  // "De Hansdampf im Schnäggeloch", the Swiss version of the Alsatian
+  // "D'r Hans im Schnokeloch". 2/4 with an eighth pickup; tune from the ABC
+  // (abcnotation) and the liederkiste score, transposed from G down a fifth
+  // to C. "Hans-dampf" splits the first quarter into two eighths. Sung form:
+  // first line twice. The final "will" is shortened to complete the pickup bar.
   song(
     'hans',
-    "D'r Hans im Schnokeloch",
+    'De Hansdampf im Schnäggeloch',
     '🐌',
     100,
-    `G3:D'r:0.5 C4:Hans G4:im E4:Schno-:0.75 D4:ke-:0.25 C4:loch:0.5 C4:hett:0.5
+    `G3:De:0.5 C4:Hans-:0.5 C4:dampf:0.5 G4:im E4:Schnäg-:0.75 D4:ge-:0.25 C4:loch:0.5 C4:hät:0.5
      D4:al-:0.5 D4:les:0.5 G3:was:0.5 G3:er:0.5 C4:will:1.5
-     G3:D'r:0.5 C4:Hans G4:im E4:Schno-:0.75 D4:ke-:0.25 C4:loch:0.5 C4:hett:0.5
+     G3:De:0.5 C4:Hans-:0.5 C4:dampf:0.5 G4:im E4:Schnäg-:0.75 D4:ge-:0.25 C4:loch:0.5 C4:hät:0.5
      D4:al-:0.5 D4:les:0.5 G3:was:0.5 G3:er:0.5 C4:will:1.5
-     E4:un:0.5 D4:was:0.5 E4:er:0.5 F4:hett:0.5 D4:des:0.5
-     E4:will:0.5 F4:er:0.5 G4:nit:0.5 E4:un:0.5
-     D4:was:0.5 E4:er:0.5 F4:will:0.5 D4:des:0.5
-     E4:hett:0.5 F4:er:0.5 G4:nit:0.5 G3:D'r:0.5
-     C4:Hans G4:im E4:Schno-:0.75 D4:ke-:0.25 C4:loch:0.5 C4:hett:0.5
+     E4:und:0.5 D4:was:0.5 E4:er:0.5 F4:hät:0.5 D4:das:0.5
+     E4:will:0.5 F4:er:0.5 G4:nöd:0.5 E4:und:0.5
+     D4:was:0.5 E4:er:0.5 F4:will:0.5 D4:das:0.5
+     E4:hät:0.5 F4:er:0.5 G4:nöd:0.5 G3:De:0.5
+     C4:Hans-:0.5 C4:dampf:0.5 G4:im E4:Schnäg-:0.75 D4:ge-:0.25 C4:loch:0.5 C4:hät:0.5
      D4:al-:0.5 D4:les:0.5 G3:was:0.5 G3:er:0.5 C4:will:1.5`,
     2,
   ),
