@@ -555,15 +555,36 @@ export class App {
     this.tuneHistory = [];
   }
 
+  /**
+   * One tile per song: its big emoji (what the child recognises), the title
+   * (for the grown-up), and six little strings, high E on top like the
+   * strings canvas, with the ones the song uses lit in their color.
+   */
   private buildSongPicker(): void {
-    this.songPicker.innerHTML = `<h2>${this.t.pickSong}</h2>`;
+    this.songPicker.innerHTML = `<h2 id="pickSongTitle">${this.t.pickSong}</h2>`;
+    const grid = document.createElement('div');
+    grid.className = 'song-grid';
+    grid.setAttribute('role', 'group');
+    grid.setAttribute('aria-labelledby', 'pickSongTitle');
     for (const song of SONGS) {
+      const used = new Set(song.notes.map((n) => n.string));
+      const strings = [...OPEN_STRINGS]
+        .reverse()
+        .map(
+          (s) =>
+            `<i class="${used.has(s.index) ? 'on' : ''}" style="--c:${s.color};--g:${s.index}"></i>`,
+        )
+        .join('');
       const btn = document.createElement('button');
-      btn.className = 'song-btn';
-      btn.innerHTML = `<span class="song-fig">${song.figurine}</span> ${song.title}`;
+      btn.className = 'song-tile';
+      btn.innerHTML =
+        `<span class="song-fig" aria-hidden="true">${song.figurine}</span>` +
+        `<span class="song-title">${song.title}</span>` +
+        `<span class="song-strings" aria-hidden="true">${strings}</span>`;
       btn.addEventListener('click', () => this.startSong(song));
-      this.songPicker.appendChild(btn);
+      grid.appendChild(btn);
     }
+    this.songPicker.appendChild(grid);
   }
 
   private showSongPicker(): void {
