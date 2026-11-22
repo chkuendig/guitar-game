@@ -4,6 +4,7 @@ import {
   DETECT_MAX_HZ,
   DETECT_MIN_HZ,
   FRAME_SIZE,
+  TUNE_CONFIRM_MS,
   TUNE_OK_CENTS,
   WIDE_MAX_HZ,
   WIDE_MIN_HZ,
@@ -16,6 +17,7 @@ import type { GameEvent } from '../game/engine';
 import { MicInput } from '../audio/mic';
 import { PluckSynth } from '../audio/pluck';
 import { playFanfare } from '../audio/fanfare';
+import { playAllTunedChime, playTunedChime } from '../audio/chime';
 import { SimSource } from '../sim';
 import { SongEngine } from '../play/song-engine';
 import type { SongEvent } from '../play/song-engine';
@@ -91,6 +93,13 @@ export class App {
   private lastHeardUiMs = 0;
   private lastPlayTrackMs = 0;
   private lastTunedString: number | null = null;
+  /** Tune mode: since when each string has been in tune (for the chime). */
+  private readonly tuneOkSince: (number | null)[] = OPEN_STRINGS.map(() => null);
+  /** Tune mode: strings whose "tuned" chime has played (until they drift). */
+  private readonly tuneChimed: boolean[] = OPEN_STRINGS.map(() => false);
+  private allTunedChimed = false;
+  /** Tune mode: ignore the mic until then (our own chime is playing). */
+  private tuneIgnoreUntilMs = 0;
 
   private vizHeard: VizHeard | null = null;
   private playback: VizPlayback | null = null;
@@ -441,6 +450,7 @@ export class App {
    * that stays put while the child moves on to the next string.
    */
   private updateTuner(frequency: number | null, level: number, now: number): void {
+    if (now < this.tuneIgnoreUntilMs) return;
     if (frequency !== null && level > 0.003) {
       const match = nearestOpenString(frequency);
       this.tuneHistory.push({ string: match.stringIndex, cents: match.cents, atMs: now });
@@ -492,6 +502,43 @@ export class App {
       this.lastTunedString = string;
       track('tune.string', { string, cents: rounded });
     }
+    this.checkTuned(string, cents, now);
+  }
+
+  /**
+   * Like a tuner app: once a string has stayed in tune for TUNE_CONFIRM_MS,
+   * play a chime and pop its figurine; once all six are, a bigger chime.
+   * A string that drifts clearly out again can chime again later.
+   */
+  private checkTuned(string: number, cents: number, now: number): void {
+    if (Math.abs(cents) > TUNE_OK_CENTS + 5) {
+      this.tuneOkSince[string] = null;
+      this.tuneChimed[string] = false;
+      this.allTunedChimed = false;
+      return;
+    }
+    if (Math.abs(cents) > TUNE_OK_CENTS) return;
+    this.tuneOkSince[string] ??= now;
+    if (this.tuneChimed[string] || now - this.tuneOkSince[string]! < TUNE_CONFIRM_MS) return;
+
+    this.tuneChimed[string] = true;
+    track('tune.tuned', { string, cents: Math.round(cents) });
+    this.tuneFigurine.classList.remove('tuned');
+    void this.tuneFigurine.offsetWidth; // restart the pop animation
+    this.tuneFigurine.classList.add('tuned');
+    const all = this.tuneChimed.every(Boolean);
+    let chimeMs = 0;
+    if (this.ctx) {
+      chimeMs = all && !this.allTunedChimed ? playAllTunedChime(this.ctx) : playTunedChime(this.ctx);
+    }
+    if (all && !this.allTunedChimed) {
+      this.allTunedChimed = true;
+      this.tuneInstr.className = 'tune-instr ok';
+      this.tuneInstr.textContent = this.t.allTuned;
+    }
+    // Don't let the tuner hear its own chime.
+    this.tuneIgnoreUntilMs = now + chimeMs + 250;
+    this.tuneHistory = [];
   }
 
   private buildSongPicker(): void {
@@ -593,15 +640,16 @@ export class App {
         this.celeFigurine.textContent = song.figurine;
         this.celebration.classList.remove('hidden');
         this.celebration.classList.add('active');
-        // Play the whole melody back as a reward (input is ignored: song done).
-        const step = 0.36;
-        let toneMs = 1800;
-        if (this.synth) {
-          song.notes.forEach((note, i) => {
-            toneMs = this.synth!.playFrequency(midiToFrequency(note.midi), i * step, 0.6);
-          });
+        // Play the whole melody back as a reward, in the song's rhythm and
+        // tempo (input is ignored: the song is done).
+        const beatSec = 60 / song.bpm;
+        let at = 0.15;
+        for (const note of song.notes) {
+          const lengthSec = note.beats * beatSec;
+          this.synth?.playFrequency(midiToFrequency(note.midi), at, 0.6, lengthSec * 0.95);
+          at += lengthSec;
         }
-        const totalMs = song.notes.length * step * 1000 + toneMs * 0.5;
+        const totalMs = (at + 0.6) * 1000;
         this.clearRoundTimer();
         this.roundTimer = window.setTimeout(() => {
           this.celebration.classList.add('hidden');

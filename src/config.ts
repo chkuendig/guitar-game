@@ -77,6 +77,8 @@ export const PLAY_TOLERANCE_CENTS = 90;
 
 // Tune mode: within this many cents a string counts as in tune (✓).
 export const TUNE_OK_CENTS = 7;
+// ...and it must stay there this long before the "tuned" chime plays.
+export const TUNE_CONFIRM_MS = 500;
 // Repeated notes (E E E E) need a fresh pluck: after each counted note the
 // level must rise to this multiple of its lowest point since then.
 export const PLAY_ONSET_RATIO = 1.8;

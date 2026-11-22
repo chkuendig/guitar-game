@@ -46,7 +46,8 @@ const tiny = (midis: number[]): Song => ({
   id: 'test',
   title: 'test',
   figurine: '🎵',
-  notes: midis.map((midi, i) => ({ midi, syllable: String(i), ...positionFor(midi) })),
+  bpm: 100,
+  notes: midis.map((midi, i) => ({ midi, syllable: String(i), beats: 1, ...positionFor(midi) })),
 });
 
 describe('songs', () => {
@@ -77,6 +78,31 @@ describe('songs', () => {
     expect(names).toEqual([
       55, 57, 59, 60, 62, 62, 64, 64, 64, 64, 62, 64, 64, 64, 64, 62, 60, 60, 60, 60, 59, 59, 57, 57, 57, 57, 55,
     ]);
+  });
+});
+
+describe('song data', () => {
+  it('5 Little Ducks matches the KidsPlayMusic tab (strings and frets)', () => {
+    const ducks = SONGS.find((s) => s.id === 'ducks')!;
+    // [string, fret] per note — 5 = high E, 4 = B, 3 = G
+    const tab = ducks.notes.map((n) => `${n.string}:${n.fret}`).join(' ');
+    expect(tab).toBe(
+      [
+        '5:0 3:0 3:0 3:0 3:0 5:0 4:3 4:3', // Five little ducks went out one day
+        '4:3 3:0 3:0 3:0 3:0 4:3 4:1 4:1', // Over the hills and far away
+        '5:0 5:0 3:0 3:0 5:0 5:0 4:3 4:3 4:3', // Mother duck said quack quack quack quack. But
+        '5:3 5:3 5:3 5:1 5:1 5:0 4:3 4:1', // only four little ducks came back
+      ].join(' '),
+    );
+  });
+
+  it('both songs fill whole 4/4 bars', () => {
+    for (const song of SONGS) {
+      const beats = song.notes.reduce((sum, n) => sum + n.beats, 0);
+      expect(beats % 4, song.id).toBe(0);
+    }
+    expect(SONGS.find((s) => s.id === 'aentli')!.notes.reduce((t, n) => t + n.beats, 0)).toBe(40);
+    expect(SONGS.find((s) => s.id === 'ducks')!.notes.reduce((t, n) => t + n.beats, 0)).toBe(32);
   });
 });
 

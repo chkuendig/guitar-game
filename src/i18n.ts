@@ -42,6 +42,8 @@ export interface Strings {
   /** Tune mode instructions for the plucked string. */
   tuneUp: string;
   tuneDown: string;
+  /** All six strings in tune. */
+  allTuned: string;
   /** Play mode live readout: "heard: G". */
   heard: string;
   /** Play mode: right string, but clearly out of tune. */
@@ -83,6 +85,7 @@ export const STRINGS: Record<Lang, Strings> = {
     simPlayHint: 'Taste N = nächster Ton',
     tuneUp: 'zu tief – Wirbel anziehen',
     tuneDown: 'zu hoch – Wirbel lockern',
+    allTuned: 'Alle Saiten gestimmt! 🎉',
     heard: 'gehört',
     playOutOfTune: 'klingt verstimmt – erst stimmen 🎚️',
     noteNames: ['C', 'Cis', 'D', 'Dis', 'E', 'F', 'Fis', 'G', 'Gis', 'A', 'B', 'H'],
@@ -119,6 +122,7 @@ export const STRINGS: Record<Lang, Strings> = {
     simPlayHint: 'Key N = next note',
     tuneUp: 'too low — tighten the peg',
     tuneDown: 'too high — loosen the peg',
+    allTuned: 'All strings in tune! 🎉',
     heard: 'heard',
     playOutOfTune: 'sounds out of tune — tune first 🎚️',
     noteNames: ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'B♭', 'B'],

@@ -646,3 +646,25 @@ body {
   font-size: 17px;
   opacity: 0.9;
 }
+
+/* Tune mode: big figurine that pops when its string is in tune. */
+.tune-fig {
+  font-size: 96px;
+}
+
+.tune-fig.tuned {
+  animation: tuned-pop 0.7s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+@keyframes tuned-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.35);
+    filter: drop-shadow(0 0 18px rgba(70, 167, 88, 0.9));
+  }
+  100% {
+    transform: scale(1);
+  }
+}

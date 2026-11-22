@@ -20,16 +20,25 @@ export class PluckSynth {
 
   /**
    * Play any pitch (Play mode: fretted notes, the song replay), `delaySec`
-   * from now. Returns the tone duration in ms.
+   * from now; `lengthSec` damps it after that long. Returns the tone's full
+   * (undamped) duration in ms.
    */
-  playFrequency(frequency: number, delaySec = 0, gain = 0.8): number {
+  playFrequency(frequency: number, delaySec = 0, gain = 0.8, lengthSec?: number): number {
     const buffer = this.getBuffer(frequency);
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
     const amp = this.ctx.createGain();
-    amp.gain.value = gain;
+    const start = this.ctx.currentTime + delaySec;
+    amp.gain.setValueAtTime(gain, start);
+    if (lengthSec !== undefined && lengthSec < buffer.duration) {
+      // Damp the string at the end of the note, like a player does before
+      // the next one, so the rhythm stays crisp.
+      amp.gain.setValueAtTime(gain, start + lengthSec);
+      amp.gain.exponentialRampToValueAtTime(0.001, start + lengthSec + 0.08);
+      source.stop(start + lengthSec + 0.1);
+    }
     source.connect(amp).connect(this.ctx.destination);
-    source.start(this.ctx.currentTime + delaySec);
+    source.start(start);
     return buffer.duration * 1000;
   }
 

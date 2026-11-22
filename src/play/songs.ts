@@ -12,6 +12,8 @@ import { OPEN_STRINGS } from '../strings';
 export interface SongNote {
   midi: number;
   syllable: string;
+  /** Length in beats (1 = quarter note), for the replay's rhythm. */
+  beats: number;
   /** Open-string index (0 = low E … 5 = high E), from positionFor(). */
   string: number;
   /** Fret to hold: 0 = open string. */
@@ -22,6 +24,8 @@ export interface Song {
   id: string;
   title: string;
   figurine: string;
+  /** Replay tempo, quarter notes per minute. */
+  bpm: number;
   notes: SongNote[];
 }
 
@@ -29,7 +33,7 @@ export interface Song {
 export const OPEN_STRING_MIDI = [40, 45, 50, 55, 59, 64] as const;
 
 const NOTE_MIDI: Record<string, number> = {
-  G3: 55, A3: 57, B3: 59, C4: 60, D4: 62, E4: 64, F4: 65,
+  G3: 55, A3: 57, B3: 59, C4: 60, D4: 62, E4: 64, F4: 65, G4: 67,
 };
 
 export function midiToFrequency(midi: number): number {
@@ -50,44 +54,54 @@ export function positionFor(midi: number): { string: number; fret: number } {
   return best;
 }
 
-/** Build a song from "NOTE:syllable" tokens, e.g. "G3:Al A3:li". */
-function song(id: string, title: string, figurine: string, tokens: string): Song {
+/**
+ * Build a song from "NOTE:syllable:beats" tokens, e.g. "G3:Al-:1 D4:Änt-:2".
+ * Beats default to 1 (a quarter note); "0.5" is an eighth.
+ */
+function song(id: string, title: string, figurine: string, bpm: number, tokens: string): Song {
   const notes = tokens
     .trim()
     .split(/\s+/)
     .map((token) => {
-      const [name, syllable] = token.split(':');
+      const [name, syllable, beats = '1'] = token.split(':');
       const midi = NOTE_MIDI[name];
       if (midi === undefined) throw new Error(`unknown note ${name}`);
-      return { midi, syllable: syllable.replace(/_/g, ' '), ...positionFor(midi) };
+      return { midi, syllable: syllable.replace(/_/g, ' '), beats: Number(beats), ...positionFor(midi) };
     });
-  return { id, title, figurine, notes };
+  return { id, title, figurine, bpm, notes };
 }
 
 export const SONGS: Song[] = [
   // "Alle meine Entchen", Swiss German words, transposed to G so it starts on
-  // the open G string: G A B C D D | E E E E D | E E E E D | C C C C B B | A A A A G.
+  // the open G string. 4/4: G A B C | D(h) D(h) | E E E E | D(w) | E E E E |
+  // D(w) | C C C C | B(h) B(h) | A A A A | G(w).
   song(
     'aentli',
     'Alli mini Äntli',
     '🦆',
-    `G3:Al- A3:li B3:mi- C4:ni D4:Änt- D4:li
-     E4:schwüm- E4:med E4:uf E4:em D4:See
-     E4:schwüm- E4:med E4:uf E4:em D4:See
-     C4:Chöpf- C4:li C4:i C4:de B3:Was- B3:ser
-     A3:Schwänz- A3:li A3:i A3:d' G3:Höh`,
+    112,
+    `G3:Al- A3:li B3:mi- C4:ni D4:Änt-:2 D4:li:2
+     E4:schwüm- E4:med E4:uf E4:em D4:See:4
+     E4:schwüm- E4:med E4:uf E4:em D4:See:4
+     C4:Chöpf- C4:li C4:i C4:de B3:Was-:2 B3:ser:2
+     A3:Schwänz- A3:li A3:i A3:d' G3:Höh:4`,
   ),
-  // "Five Little Ducks", in C, lines 1–3 after the Skoove beginner score. The
-  // score's image stops after the third "Quack"; the 4th "Quack" and the last
-  // line mirror lines 1 and 2, as the tune repeats its phrases.
+  // "Five Little Ducks" in C, from the owner's KidsPlayMusic tab sheet (first
+  // position on the G, B and high E strings). The tab has no rhythm; it
+  // follows the sheet's note spacing and the usual 4/4 tune:
+  //   Five lit-tle ducks went | out one day,    ♩ ♪♪ ♩ ♩ | ♩ ♩ 𝅗𝅥
+  //   O-ver the hills and | far a-way.           ♩ ♪♪ ♩ ♩ | ♩ ♩ 𝅗𝅥
+  //   Mo-ther duck said "Quack, | quack, quack, quack". But   ♪♪ ♩ ♩ ♩ | ♩ ♩ ♩ ♩
+  //   on-ly four lit-tle | ducks came back.      ♩ ♩ ♩ ♪♪ | ♩ ♩ 𝅗𝅥
   song(
     'ducks',
     '5 Little Ducks',
     '🐥',
-    `G3:Five E4:lit- E4:tle E4:ducks F4:went E4:swim- D4:ming D4:one D4:day
-     G3:O- D4:ver D4:the D4:hills E4:and D4:far C4:a- C4:way
-     G3:Moth- G3:er E4:Duck E4:said F4:Quack E4:Quack D4:Quack D4:Quack
-     G3:But D4:on- D4:ly D4:four E4:lit- E4:tle D4:ducks C4:came C4:back`,
+    104,
+    `E4:Five G3:lit-:0.5 G3:tle:0.5 G3:ducks G3:went E4:out D4:one D4:day:2
+     D4:O- G3:ver:0.5 G3:the:0.5 G3:hills G3:and D4:far C4:a- C4:way:2
+     E4:Mo-:0.5 E4:ther:0.5 G3:duck G3:said E4:Quack E4:quack D4:quack D4:quack D4:But
+     G4:on- G4:ly G4:four F4:lit-:0.5 F4:tle:0.5 E4:ducks D4:came C4:back:2`,
   ),
 ];
 
