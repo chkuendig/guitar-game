@@ -63,3 +63,15 @@ export const TRUMPET_MIN_HZ = 450;
 // Wide-range detection band used for that check.
 export const WIDE_MIN_HZ = 150;
 export const WIDE_MAX_HZ = 2000;
+
+// --- Play mode (songs) -------------------------------------------------------
+// A note counts after ringing this long — shorter than Pluck mode's HOLD_MS so
+// a song keeps flowing.
+export const PLAY_HOLD_MS = 250;
+// How far (cents) a played note may be from the written pitch. Neighbouring
+// notes in the songs are 100–200 cents apart (B→C is 100), so this stays
+// below the half-way point plus a little slack for an imperfect guitar.
+export const PLAY_TOLERANCE_CENTS = 60;
+// Repeated notes (E E E E) need a fresh pluck: after each counted note the
+// level must rise to this multiple of its lowest point since then.
+export const PLAY_ONSET_RATIO = 1.8;

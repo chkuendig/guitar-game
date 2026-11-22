@@ -27,11 +27,23 @@ export interface Strings {
   colorNames: string[];
   /** Name of the trumpet target in hints (hidden ?trumpet option). */
   trumpetName: string;
+  /** "Tune · Pluck · Play" — the three modes, also the app's subtitle. */
+  subtitle: string;
+  modeTune: string;
+  modePluck: string;
+  modePlay: string;
+  pickSong: string;
+  /** Prompt under the figurine in Play mode; {fret} is filled in. */
+  holdFret: string;
+  openString: string;
+  songDone: string;
+  songs: string;
+  simPlayHint: string;
 }
 
 export const STRINGS: Record<Lang, Strings> = {
   de: {
-    title: 'Gitarren-Spiel',
+    title: 'Guitar TPP',
     start: "Los geht's!",
     listening: 'Lass die Saite klingen …',
     success: 'Super!',
@@ -50,9 +62,19 @@ export const STRINGS: Record<Lang, Strings> = {
     outOfTuneHigh: 'zu hoch',
     colorNames: ['rot', 'orange', 'gelb', 'grün', 'blau', 'lila'],
     trumpetName: 'die Trompete',
+    subtitle: 'Stimmen · Zupfen · Spielen',
+    modeTune: 'Stimmen',
+    modePluck: 'Zupfen',
+    modePlay: 'Spielen',
+    pickSong: 'Welches Lied?',
+    holdFret: 'Finger auf Bund {fret}',
+    openString: 'leere Saite',
+    songDone: 'Bravo, das ganze Lied! 🎉',
+    songs: 'Lieder',
+    simPlayHint: 'Taste N = nächster Ton',
   },
   en: {
-    title: 'Guitar Game',
+    title: 'Guitar TPP',
     start: "Let's play!",
     listening: 'Let the string ring …',
     success: 'Yay!',
@@ -71,6 +93,16 @@ export const STRINGS: Record<Lang, Strings> = {
     outOfTuneHigh: 'too high',
     colorNames: ['red', 'orange', 'yellow', 'green', 'blue', 'purple'],
     trumpetName: 'the trumpet',
+    subtitle: 'Tune · Pluck · Play',
+    modeTune: 'Tune',
+    modePluck: 'Pluck',
+    modePlay: 'Play',
+    pickSong: 'Which song?',
+    holdFret: 'Hold fret {fret}',
+    openString: 'open string',
+    songDone: 'You played the whole song! 🎉',
+    songs: 'Songs',
+    simPlayHint: 'Key N = next note',
   },
 };
 

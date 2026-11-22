@@ -15,26 +15,36 @@ export class PluckSynth {
 
   /** Play the string's tone. Returns the tone duration in ms. */
   play(string: OpenString, gain = 0.8): number {
-    const buffer = this.getBuffer(string);
+    return this.playFrequency(string.frequency, 0, gain);
+  }
+
+  /**
+   * Play any pitch (Play mode: fretted notes, the song replay), `delaySec`
+   * from now. Returns the tone duration in ms.
+   */
+  playFrequency(frequency: number, delaySec = 0, gain = 0.8): number {
+    const buffer = this.getBuffer(frequency);
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
     const amp = this.ctx.createGain();
     amp.gain.value = gain;
     source.connect(amp).connect(this.ctx.destination);
-    source.start();
+    source.start(this.ctx.currentTime + delaySec);
     return buffer.duration * 1000;
   }
 
-  private getBuffer(string: OpenString): AudioBuffer {
-    const cached = this.cache.get(string.index);
+  /** Rendered tones are cached by frequency (rounded to 0.1 Hz). */
+  private getBuffer(frequency: number): AudioBuffer {
+    const key = Math.round(frequency * 10);
+    const cached = this.cache.get(key);
     if (cached) return cached;
 
     const sr = this.ctx.sampleRate;
     const duration = 1.8;
     const buffer = this.ctx.createBuffer(1, Math.round(sr * duration), sr);
     const out = buffer.getChannelData(0);
-    karplusStrongInto(out, string.frequency, sr);
-    this.cache.set(string.index, buffer);
+    karplusStrongInto(out, frequency, sr);
+    this.cache.set(key, buffer);
     return buffer;
   }
 }

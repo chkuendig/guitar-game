@@ -24,6 +24,12 @@ export class SimSource {
     this.startMs = nowMs;
   }
 
+  /** A plucked note at any pitch (Play mode: key N plays the current note). */
+  pluckFrequency(frequency: number, nowMs: number): void {
+    this.signal = synthesizePluck(frequency, this.sampleRate, 1.8);
+    this.startMs = nowMs;
+  }
+
   /** A sustained trumpet blow (~1.2 s) — hidden ?trumpet option, key 7. */
   blow(nowMs: number): void {
     this.signal = synthesizeBlow(530, this.sampleRate, 1.2);

@@ -1,10 +1,17 @@
-# Guitar Game
+# Guitar TPP — Tune · Pluck · Play
 
-A browser game that teaches a young child the six open guitar strings
-(E2 A2 D3 G3 B3 E4). The game asks for one string — shown as its own color and
-figurine — listens through the microphone, and when the right note rings long
-enough it plays the tone back (Karplus-Strong synth) with a little celebration.
-No fail states, no timers. Open strings only, one hand.
+A browser game that teaches a young child the guitar, in three modes (toggle
+in the top bar):
+
+- **Tune** — a simple tuner meter for the six open strings.
+- **Pluck** — the game asks for one open string (E2 A2 D3 G3 B3 E4), shown as
+  its own color and figurine, listens through the microphone, and when the
+  right note rings long enough plays it back (Karplus-Strong synth) with a
+  little celebration. No fail states, no timers.
+- **Play** — play a song note by note: *Alli mini Äntli* (Alle meine
+  Entchen) or *5 Little Ducks*. Each note shows the string's figurine and the
+  fret number to hold (0 = open string); all notes are in first position on
+  the G, B and high E strings.
 
 Text is minimal and lives in `src/i18n.ts`: German (default) and English
 (`?lang=en`).

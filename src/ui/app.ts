@@ -9,6 +9,10 @@ import { MicInput } from '../audio/mic';
 import { PluckSynth } from '../audio/pluck';
 import { playFanfare } from '../audio/fanfare';
 import { SimSource } from '../sim';
+import { SongEngine } from '../play/song-engine';
+import type { SongEvent } from '../play/song-engine';
+import { SONGS, midiToFrequency, stringFigurine } from '../play/songs';
+import type { Song } from '../play/songs';
 import { track } from '../telemetry';
 import { STRINGS } from '../i18n';
 import type { Lang, Strings } from '../i18n';
@@ -24,6 +28,8 @@ interface VizHeard {
   level: number;
   atMs: number;
 }
+
+type Mode = 'tune' | 'pluck' | 'play';
 
 interface VizPlayback {
   stringIndex: number;
@@ -42,7 +48,9 @@ export class App {
 
   private started = false;
   private simMode: boolean;
-  private tuneMode = false;
+  /** Tune · Pluck · Play. Pluck (the original game) is the default. */
+  private mode: Mode = 'pluck';
+  private readonly songEngine: SongEngine;
 
   private readonly canvas: HTMLCanvasElement;
   private readonly g: CanvasRenderingContext2D;
@@ -59,6 +67,11 @@ export class App {
   private readonly tuneCents: HTMLElement;
   private readonly celebration: HTMLElement;
   private readonly celeFigurine: HTMLElement;
+  private readonly stage: HTMLElement;
+  private readonly fretBadge: HTMLElement;
+  private readonly songStrip: HTMLElement;
+  private readonly songPicker: HTMLElement;
+  private readonly songsBtn: HTMLElement;
 
   private vizHeard: VizHeard | null = null;
   private playback: VizPlayback | null = null;
@@ -98,15 +111,28 @@ export class App {
     this.tuneCents = root.querySelector('#tuneCents')!;
     this.celebration = root.querySelector('#celebration')!;
     this.celeFigurine = root.querySelector('#celeFigurine')!;
+    this.stage = root.querySelector('.stage')!;
+    this.fretBadge = root.querySelector('#fretBadge')!;
+    this.songStrip = root.querySelector('#songStrip')!;
+    this.songPicker = root.querySelector('#songPicker')!;
+    this.songsBtn = root.querySelector('#songsBtn')!;
 
     this.engine = new GameEngine((e) => this.onEngineEvent(e), { trumpet });
+    this.songEngine = new SongEngine((e) => this.onSongEvent(e));
+    this.buildSongPicker();
 
     root.querySelector('#startBtn')!.addEventListener('click', () => void this.start());
-    root.querySelector('#tuneBtn')!.addEventListener('click', () => this.setTuneMode(true));
-    root.querySelector('#tuneBack')!.addEventListener('click', () => this.setTuneMode(false));
+    root.querySelectorAll<HTMLButtonElement>('.mode-btn').forEach((btn) =>
+      btn.addEventListener('click', () => this.setMode(btn.dataset.mode as Mode)),
+    );
+    this.songsBtn.addEventListener('click', () => this.showSongPicker());
 
     window.addEventListener('keydown', (e) => {
       if (!this.simMode || !this.started) return;
+      if (e.key === 'n' || e.key === 'N') {
+        this.playNextNoteSim();
+        return;
+      }
       const index = '1234567'.indexOf(e.key);
       if (index === TRUMPET) {
         if (this.trumpetEnabled) this.blowSim();
@@ -122,19 +148,27 @@ export class App {
     return `
       <header class="topbar">
         <div class="title">${t.title}</div>
-        <button id="tuneBtn" class="chip" aria-label="${t.tune}">🎸</button>
+        <nav class="modes" aria-label="${t.subtitle}">
+          <button class="mode-btn" data-mode="tune">🎚️<span>${t.modeTune}</span></button>
+          <button class="mode-btn active" data-mode="pluck">🦀<span>${t.modePluck}</span></button>
+          <button class="mode-btn" data-mode="play">🦆<span>${t.modePlay}</span></button>
+        </nav>
       </header>
       <main class="stage">
         <section class="prompt">
+          <button id="songsBtn" class="chip songs-btn hidden">🎵 ${t.songs}</button>
           <div class="figurine-wrap">
             <svg class="ring" viewBox="0 0 120 120">
               <circle class="ring-bg" cx="60" cy="60" r="52"/>
               <circle class="ring-fill" id="ringFill" cx="60" cy="60" r="52"/>
             </svg>
             <div class="figurine" id="promptFigurine">🎸</div>
+            <div class="fret-badge hidden" id="fretBadge"></div>
           </div>
           <div class="prompt-label" id="promptLabel">${t.listening}</div>
         </section>
+        <div class="song-strip hidden" id="songStrip"></div>
+        <div class="song-picker hidden" id="songPicker"></div>
         <canvas id="stringsCanvas"></canvas>
         <div class="message" id="message"></div>
         <div class="simbar hidden" id="simBar"></div>
@@ -143,6 +177,7 @@ export class App {
         <div class="start-card">
           <div class="start-fig">🎸</div>
           <h1>${t.title}</h1>
+          <p class="subtitle">${t.subtitle}</p>
           <button id="startBtn" class="big-btn">${t.start}</button>
           ${this.simMode ? `<p class="sim-note">${t.simHint}</p>` : ''}
         </div>
@@ -162,7 +197,6 @@ export class App {
           </svg>
           <div class="tune-readout"><span id="tuneName">–</span><span id="tuneCents"></span></div>
           <div class="tune-hint">${this.t.tunePrompt}</div>
-          <button id="tuneBack" class="big-btn small">${t.back}</button>
         </div>
       </section>
       <div class="celebration hidden" id="celebration">
@@ -223,6 +257,12 @@ export class App {
       btn.addEventListener('click', () => this.pluckSim(s.index));
       this.simBar.appendChild(btn);
     }
+    const next = document.createElement('button');
+    next.className = 'sim-btn';
+    next.innerHTML = `<span class="sim-fig">🎵</span><span class="sim-name">N</span>`;
+    next.title = this.t.simPlayHint;
+    next.addEventListener('click', () => this.playNextNoteSim());
+    this.simBar.appendChild(next);
     if (this.trumpetEnabled) {
       const horn = document.createElement('button');
       horn.className = 'sim-btn';
@@ -243,12 +283,167 @@ export class App {
     this.sim?.pluck(index, performance.now());
   }
 
-  private setTuneMode(on: boolean): void {
+  /** Play mode in sim: pluck the note the song is waiting for (key N). */
+  private playNextNoteSim(): void {
+    const note = this.currentNote();
+    if (this.mode !== 'play' || !note) return;
+    track('sim.note', { midi: note.midi });
+    this.sim?.pluckFrequency(midiToFrequency(note.midi), performance.now());
+  }
+
+  /** Switch between Tune, Pluck and Play (the toggle in the top bar). */
+  private setMode(mode: Mode): void {
     if (!this.started) return;
-    this.tuneMode = on;
-    this.tuneScreen.classList.toggle('hidden', !on);
-    this.root.querySelector('.stage')!.classList.toggle('hidden', on);
-    if (!on) this.engine.continueRound();
+    if (mode === this.mode) {
+      // Tapping Play again goes back to the song list.
+      if (mode === 'play') this.showSongPicker();
+      return;
+    }
+    track('mode', { mode });
+    this.mode = mode;
+    this.root.querySelectorAll<HTMLButtonElement>('.mode-btn').forEach((btn) =>
+      btn.classList.toggle('active', btn.dataset.mode === mode),
+    );
+    this.clearRoundTimer();
+    this.celebration.classList.add('hidden');
+    this.celebration.classList.remove('active');
+    this.playback = null;
+    this.ringTarget = 0;
+    this.message.innerHTML = '';
+    this.tuneScreen.classList.toggle('hidden', mode !== 'tune');
+    this.stage.classList.toggle('hidden', mode === 'tune');
+    const play = mode === 'play';
+    this.songsBtn.classList.toggle('hidden', !play);
+    this.fretBadge.classList.toggle('hidden', !play);
+    this.songStrip.classList.toggle('hidden', !play);
+    if (play) {
+      this.showSongPicker();
+    } else {
+      this.songEngine.stop();
+      this.stage.classList.remove('picking');
+      this.songPicker.classList.add('hidden');
+    }
+    if (mode === 'pluck') {
+      this.showPluckTarget(this.engine.target);
+      this.engine.continueRound();
+    }
+  }
+
+  private showPluckTarget(target: number): void {
+    const s = this.noteInfo(target);
+    this.promptFigurine.textContent = s.figurine;
+    this.promptFigurine.style.filter = 'none';
+    this.ringFill.style.stroke = s.color;
+    this.promptLabel.textContent = this.t.listening;
+  }
+
+  // ---- Play mode ----------------------------------------------------------
+
+  private buildSongPicker(): void {
+    this.songPicker.innerHTML = `<h2>${this.t.pickSong}</h2>`;
+    for (const song of SONGS) {
+      const btn = document.createElement('button');
+      btn.className = 'song-btn';
+      btn.innerHTML = `<span class="song-fig">${song.figurine}</span> ${song.title}`;
+      btn.addEventListener('click', () => this.startSong(song));
+      this.songPicker.appendChild(btn);
+    }
+  }
+
+  private showSongPicker(): void {
+    this.songEngine.stop();
+    this.clearRoundTimer();
+    this.celebration.classList.add('hidden');
+    this.ringTarget = 0;
+    this.message.innerHTML = '';
+    this.stage.classList.add('picking');
+    this.songPicker.classList.remove('hidden');
+  }
+
+  private startSong(song: Song): void {
+    track('song.start', { song: song.id });
+    this.stage.classList.remove('picking');
+    this.songPicker.classList.add('hidden');
+    this.message.innerHTML = '';
+    this.songStrip.innerHTML = song.notes
+      .map((note, i) => {
+        const color = OPEN_STRINGS[note.string].color;
+        return (
+          `<div class="note-card" data-i="${i}" style="--c:${color}">` +
+          `<span class="nc-fig">${stringFigurine(note)}</span>` +
+          `<span class="nc-fret" style="color:${color}">${note.fret}</span>` +
+          `<span class="nc-syl">${note.syllable}</span></div>`
+        );
+      })
+      .join('');
+    this.songEngine.start(song);
+  }
+
+  private currentNote() {
+    const song = this.songEngine.song;
+    return song && !this.songEngine.done ? song.notes[this.songEngine.index] : null;
+  }
+
+  private onSongEvent(e: SongEvent): void {
+    const now = performance.now();
+    switch (e.type) {
+      case 'note': {
+        const note = this.songEngine.song!.notes[e.index];
+        const s = OPEN_STRINGS[note.string];
+        this.promptFigurine.textContent = s.figurine;
+        this.promptFigurine.style.filter = 'none';
+        this.ringFill.style.stroke = s.color;
+        this.fretBadge.textContent = String(note.fret);
+        this.fretBadge.style.setProperty('--c', s.color);
+        const how = note.fret === 0 ? this.t.openString : this.t.holdFret.replace('{fret}', String(note.fret));
+        this.promptLabel.innerHTML = `<b class="syl">${note.syllable}</b><span class="fret-hint">${how}</span>`;
+        this.songStrip.querySelectorAll<HTMLElement>('.note-card').forEach((card, i) => {
+          card.classList.toggle('done', i < e.index);
+          card.classList.toggle('current', i === e.index);
+        });
+        this.songStrip
+          .querySelector<HTMLElement>(`.note-card[data-i="${e.index}"]`)
+          ?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        if (e.index > 0) track('song.note', { index: e.index - 1, midi: this.songEngine.song!.notes[e.index - 1].midi });
+        break;
+      }
+      case 'hold':
+        this.ringTarget = e.progress;
+        break;
+      case 'heard': {
+        const note = this.currentNote();
+        this.vizHeard = { stringIndex: e.onTarget && note ? note.string : null, level: e.level, atMs: now };
+        break;
+      }
+      case 'done': {
+        const song = this.songEngine.song!;
+        track('song.done', { song: song.id });
+        this.songStrip.querySelectorAll('.note-card').forEach((card) => {
+          card.classList.add('done');
+          card.classList.remove('current');
+        });
+        this.message.textContent = this.t.songDone;
+        this.celeFigurine.textContent = song.figurine;
+        this.celebration.classList.remove('hidden');
+        this.celebration.classList.add('active');
+        // Play the whole melody back as a reward (input is ignored: song done).
+        const step = 0.36;
+        let toneMs = 1800;
+        if (this.synth) {
+          song.notes.forEach((note, i) => {
+            toneMs = this.synth!.playFrequency(midiToFrequency(note.midi), i * step, 0.6);
+          });
+        }
+        const totalMs = song.notes.length * step * 1000 + toneMs * 0.5;
+        this.clearRoundTimer();
+        this.roundTimer = window.setTimeout(() => {
+          this.celebration.classList.add('hidden');
+          this.celebration.classList.remove('active');
+          if (this.mode === 'play') this.showSongPicker();
+        }, totalMs);
+        break;
+      }
+    }
   }
 
   private onEngineEvent(e: GameEvent): void {
@@ -378,7 +573,7 @@ export class App {
       clarityThreshold: CLARITY_THRESHOLD,
     });
 
-    if (this.tuneMode) {
+    if (this.mode === 'tune') {
       if (pitch) {
         const match = nearestOpenString(pitch.frequency);
         const s = OPEN_STRINGS[match.stringIndex];
@@ -391,6 +586,11 @@ export class App {
         const angle = Math.max(-50, Math.min(50, match.cents)) * 1.8;
         this.needle.setAttribute('transform', `rotate(${angle} 150 140)`);
       }
+      return;
+    }
+
+    if (this.mode === 'play') {
+      this.songEngine.processFrame(pitch?.frequency ?? null, level, now);
       return;
     }
 
@@ -453,10 +653,13 @@ export class App {
       this.vizHeard && now - this.vizHeard.atMs < 250 ? this.vizHeard : null;
 
     g.textBaseline = 'middle';
+    const playNote = this.mode === 'play' ? this.currentNote() : null;
     for (const s of OPEN_STRINGS) {
       // Lowest string (index 0, low E) at the bottom, highest at the top.
       const y = top + gap * (OPEN_STRINGS.length - 1 - s.index);
-      const isTarget = this.started && !this.tuneMode && s.index === this.engine.target;
+      const isTarget =
+        this.started &&
+        (this.mode === 'pluck' ? s.index === this.engine.target : playNote?.string === s.index);
       const isHeard = heardLive?.stringIndex === s.index;
       const isPlaying = this.playback?.stringIndex === s.index;
 
@@ -503,6 +706,36 @@ export class App {
       }
       g.stroke();
       g.shadowBlur = 0;
+
+      // Play mode: where to hold — a numbered dot on the fret (0 = open string).
+      if (isTarget && playNote) {
+        const fretW = (x1 - x0) / 5;
+        const fx = playNote.fret === 0 ? x0 + 16 : x0 + fretW * (playNote.fret - 0.5);
+        g.globalAlpha = 1;
+        g.fillStyle = s.color;
+        g.beginPath();
+        g.arc(fx, y, 15, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = '#1c2540';
+        g.font = 'bold 18px system-ui, sans-serif';
+        g.textAlign = 'center';
+        g.fillText(String(playNote.fret), fx, y + 1);
+        g.textAlign = 'start';
+      }
+    }
+
+    // Play mode: faint fret lines so the numbered dot reads as a position.
+    if (playNote) {
+      g.globalAlpha = 0.18;
+      g.strokeStyle = '#ffffff';
+      g.lineWidth = 2;
+      for (let f = 1; f <= 4; f++) {
+        const fx = x0 + ((x1 - x0) / 5) * f;
+        g.beginPath();
+        g.moveTo(fx, top - 10);
+        g.lineTo(fx, top + gap * (OPEN_STRINGS.length - 1) + 10);
+        g.stroke();
+      }
     }
     g.globalAlpha = 1;
   }

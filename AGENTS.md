@@ -34,6 +34,9 @@ Keep modules separate and DOM-free below the UI layer:
 - `src/audio/mic.ts` — getUserMedia capture only.
 - `src/audio/pluck.ts` — Karplus-Strong pluck synth.
 - `src/sim.ts` — simulation mode source (synthetic plucks, same pipeline).
+- `src/play/` — Play mode: `songs.ts` (melodies as pitch + syllable; string
+  and fret are derived by `positionFor`) and `song-engine.ts` (pure note-by-note
+  engine; repeated notes need a fresh pluck).
 - `src/ui/` — DOM/canvas rendering and the rAF loop. Only this layer touches
   the DOM.
 - `src/i18n.ts`, `src/strings.ts` — text and string data (colors, figurines).
@@ -55,7 +58,8 @@ network. New detection/matching behavior gets a unit test there.
 ## Testing without a guitar
 
 `?sim=1`: keys 1–6 or the on-screen picker produce decaying synthetic plucks
-through the same pipeline as the mic. Works headless.
+through the same pipeline as the mic; in Play mode key **N** (or the 🎵 N
+button) plucks the note the song is waiting for. Works headless.
 
 ## Git
 

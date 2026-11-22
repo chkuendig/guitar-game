@@ -356,3 +356,193 @@ body {
     font-size: 100px;
   }
 }
+
+/* ---- Mode toggle: Tune · Pluck · Play ------------------------------------ */
+
+.modes {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #f2f5f9;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.mode-btn.active {
+  background: rgba(255, 255, 255, 0.22);
+  font-weight: 700;
+}
+
+@media (max-width: 380px) {
+  .mode-btn span {
+    display: none; /* emoji only on very narrow phones */
+  }
+}
+
+.start-card .subtitle {
+  margin: -6px 0 6px;
+  font-size: 18px;
+  opacity: 0.75;
+  letter-spacing: 0.04em;
+}
+
+/* Tune mode now sits under the top bar (the toggle stays reachable). */
+.tune {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  flex: 1;
+}
+
+/* ---- Play mode ----------------------------------------------------------- */
+
+.prompt {
+  position: relative;
+}
+
+.songs-btn {
+  position: absolute;
+  left: 4px;
+  top: 8px;
+  font-size: 15px;
+  padding: 6px 12px;
+  color: #f2f5f9;
+}
+
+.fret-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  min-width: 46px;
+  height: 46px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  border: 3px solid #1c2540;
+  background: var(--c, #fff);
+  color: #1c2540;
+  font-size: 28px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+
+.prompt-label .syl {
+  font-size: 26px;
+}
+
+.prompt-label .fret-hint {
+  margin-left: 10px;
+  font-size: 16px;
+  opacity: 0.8;
+}
+
+.song-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 8px 6px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.song-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.note-card {
+  flex: 0 0 auto;
+  width: 54px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 2px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  opacity: 0.8;
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.note-card .nc-fig {
+  font-size: 22px;
+}
+
+.note-card .nc-fret {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.note-card .nc-syl {
+  font-size: 12px;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.note-card.current {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 3px var(--c);
+  transform: scale(1.08);
+}
+
+.note-card.done {
+  opacity: 0.3;
+}
+
+.song-picker {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px;
+}
+
+.song-picker h2 {
+  margin: 0 0 4px;
+  font-size: 24px;
+}
+
+.song-btn {
+  min-width: 260px;
+  padding: 16px 26px;
+  border: none;
+  border-radius: 22px;
+  background: #3e63dd;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 700;
+  box-shadow: 0 5px 0 #2a47a8;
+  cursor: pointer;
+}
+
+.song-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 #2a47a8;
+}
+
+.song-btn .song-fig {
+  font-size: 30px;
+}
+
+/* While picking a song only the picker shows. */
+.stage.picking .prompt,
+.stage.picking .song-strip,
+.stage.picking #stringsCanvas {
+  display: none;
+}
