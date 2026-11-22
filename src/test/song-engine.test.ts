@@ -47,6 +47,7 @@ const tiny = (midis: number[]): Song => ({
   title: 'test',
   figurine: '🎵',
   bpm: 100,
+  beatsPerBar: 4,
   notes: midis.map((midi, i) => ({ midi, syllable: String(i), beats: 1, ...positionFor(midi) })),
 });
 
@@ -96,11 +97,12 @@ describe('song data', () => {
     );
   });
 
-  it('both songs fill whole 4/4 bars', () => {
+  it('every song fills whole bars of its time signature', () => {
     for (const song of SONGS) {
       const beats = song.notes.reduce((sum, n) => sum + n.beats, 0);
-      expect(beats % 4, song.id).toBe(0);
+      expect(beats % song.beatsPerBar, song.id).toBe(0);
     }
+    expect(SONGS.find((s) => s.id === 'birthday')!.notes.reduce((t, n) => t + n.beats, 0)).toBe(24);
     expect(SONGS.find((s) => s.id === 'aentli')!.notes.reduce((t, n) => t + n.beats, 0)).toBe(40);
     expect(SONGS.find((s) => s.id === 'ducks')!.notes.reduce((t, n) => t + n.beats, 0)).toBe(32);
   });

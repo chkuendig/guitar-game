@@ -5,7 +5,7 @@ import { OPEN_STRINGS } from '../strings';
  * syllable; the string and fret to show are derived from the pitch
  * (`positionFor`), so the "number to hold" can never disagree with the melody.
  *
- * Both songs are traditional (public domain) and sit in first position on the
+ * All songs are traditional (public domain) and sit in first position on the
  * three highest strings (G, B, high E) with frets 0–3: easy for small hands.
  */
 
@@ -26,6 +26,8 @@ export interface Song {
   figurine: string;
   /** Replay tempo, quarter notes per minute. */
   bpm: number;
+  /** Beats per bar (time signature numerator, quarter-note beats). */
+  beatsPerBar: number;
   notes: SongNote[];
 }
 
@@ -58,7 +60,14 @@ export function positionFor(midi: number): { string: number; fret: number } {
  * Build a song from "NOTE:syllable:beats" tokens, e.g. "G3:Al-:1 D4:Änt-:2".
  * Beats default to 1 (a quarter note); "0.5" is an eighth.
  */
-function song(id: string, title: string, figurine: string, bpm: number, tokens: string): Song {
+function song(
+  id: string,
+  title: string,
+  figurine: string,
+  bpm: number,
+  tokens: string,
+  beatsPerBar = 4,
+): Song {
   const notes = tokens
     .trim()
     .split(/\s+/)
@@ -68,7 +77,7 @@ function song(id: string, title: string, figurine: string, bpm: number, tokens: 
       if (midi === undefined) throw new Error(`unknown note ${name}`);
       return { midi, syllable: syllable.replace(/_/g, ' '), beats: Number(beats), ...positionFor(midi) };
     });
-  return { id, title, figurine, bpm, notes };
+  return { id, title, figurine, bpm, beatsPerBar, notes };
 }
 
 export const SONGS: Song[] = [
@@ -102,6 +111,22 @@ export const SONGS: Song[] = [
      D4:O- G3:ver:0.5 G3:the:0.5 G3:hills G3:and D4:far C4:a- C4:way:2
      E4:Mo-:0.5 E4:ther:0.5 G3:duck G3:said E4:Quack E4:quack D4:quack D4:quack D4:But
      G4:on- G4:ly G4:four F4:lit-:0.5 F4:tle:0.5 E4:ducks D4:came C4:back:2`,
+  ),
+  // "Happy Birthday to You" (public domain), 3/4, one octave below its usual
+  // C so it fits first position: G3–G4 on the G, B and high E strings.
+  // Pickup "Hap-py" is a dotted eighth + sixteenth; "Na- me" is the
+  // birthday child's name (two syllables).
+  //   G G | A G C | B — G G | A G D | C — G G | G' E C | B A F F | E C D | C —
+  song(
+    'birthday',
+    'Happy Birthday',
+    '🎂',
+    96,
+    `G3:Hap-:0.75 G3:py:0.25 A3:birth- G3:day C4:to B3:you:2
+     G3:Hap-:0.75 G3:py:0.25 A3:birth- G3:day D4:to C4:you:2
+     G3:Hap-:0.75 G3:py:0.25 G4:birth- E4:day C4:dear B3:Na- A3:me
+     F4:Hap-:0.75 F4:py:0.25 E4:birth- C4:day D4:to C4:you:2`,
+    3,
   ),
 ];
 

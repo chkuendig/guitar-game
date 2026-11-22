@@ -668,3 +668,10 @@ body {
     transform: scale(1);
   }
 }
+
+/* More songs: let the picker scroll on short phones. */
+.song-picker {
+  overflow-y: auto;
+  justify-content: flex-start;
+  padding-top: 24px;
+}
