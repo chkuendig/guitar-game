@@ -675,3 +675,147 @@ body {
   justify-content: flex-start;
   padding-top: 24px;
 }
+
+/* ---- Phones in landscape: side by side ----------------------------------
+   Stacked, the top bar and figurine eat most of the ~330px of height. Here
+   the figurine column sits left of the strings, and Tune puts its string
+   list next to the gauge. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .topbar {
+    padding: 4px 12px;
+  }
+
+  .topbar .title {
+    font-size: 15px;
+  }
+
+  .mode-btn {
+    padding: 4px 10px;
+    font-size: 14px;
+  }
+
+  .stage {
+    display: grid;
+    grid-template-columns: minmax(150px, 26%) 1fr;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    column-gap: 8px;
+  }
+
+  .prompt {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .songs-btn {
+    position: static;
+    order: -1;
+    margin-bottom: 6px;
+  }
+
+  .figurine-wrap {
+    width: 104px;
+    height: 104px;
+  }
+
+  .figurine {
+    font-size: 54px;
+  }
+
+  .prompt-label {
+    text-align: center;
+    font-size: 16px;
+  }
+
+  .prompt-label .syl {
+    display: block;
+    font-size: 24px;
+  }
+
+  .prompt-label .fret-hint {
+    margin-left: 0;
+    font-size: 14px;
+  }
+
+  .song-strip {
+    grid-column: 2;
+    grid-row: 1;
+    padding: 6px 6px 2px;
+  }
+
+  .note-card {
+    font-size: 24px;
+  }
+
+  #stringsCanvas {
+    grid-column: 2;
+    grid-row: 2;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .message {
+    grid-column: 2;
+    grid-row: 3;
+    min-height: 26px;
+    font-size: 17px;
+    padding: 2px 8px;
+  }
+
+  .simbar {
+    grid-column: 2;
+    grid-row: 4;
+  }
+
+  .song-picker {
+    grid-column: 1 / -1;
+    grid-row: 1 / -1;
+    padding-top: 8px;
+  }
+
+  /* Tune: gauge + instructions left, string list right. */
+  .tune {
+    overflow: auto;
+  }
+
+  .tune-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: auto;
+    align-items: center;
+    justify-items: center;
+    column-gap: 20px;
+    row-gap: 2px;
+    width: min(760px, 96vw);
+  }
+
+  .tune-card > * {
+    grid-column: 1;
+  }
+
+  .tune-card > .tune-strings {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    margin-top: 0;
+    width: 100%;
+    max-width: 340px;
+  }
+
+  .tune-fig {
+    font-size: 60px;
+  }
+
+  .gauge {
+    width: min(240px, 100%);
+  }
+
+  .tune-instr {
+    font-size: 18px;
+    padding: 4px 10px;
+  }
+
+  .ts-row {
+    padding: 2px 8px;
+  }
+}
