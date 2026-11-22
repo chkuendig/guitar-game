@@ -210,6 +210,7 @@ export class App {
           <h1>${t.title}</h1>
           <p class="subtitle">${t.subtitle}</p>
           <button id="startBtn" class="big-btn">${t.start}</button>
+          <p class="mic-error hidden" id="micError">${t.micDenied}</p>
           ${this.simMode ? `<p class="sim-note">${t.simHint}</p>` : ''}
         </div>
       </div>
@@ -268,9 +269,15 @@ export class App {
         }
       }
       if (!this.mic) {
-        this.simMode = true;
-        this.message.textContent = this.t.micDenied;
+        // No silent switch to practice mode (that's ?sim=1 only): say the mic
+        // is needed and let them tap Start again after allowing it.
         track('mic.denied', { error: micError ?? 'unknown' });
+        this.root.querySelector('#micError')?.classList.remove('hidden');
+        void this.ctx?.close();
+        this.ctx = null;
+        this.synth = null;
+        this.started = false;
+        return;
       }
     }
     if (this.simMode) this.buildSimBar();

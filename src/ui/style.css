@@ -819,3 +819,11 @@ body {
     padding: 2px 8px;
   }
 }
+
+.mic-error {
+  max-width: 300px;
+  margin: 4px auto 0;
+  font-size: 17px;
+  line-height: 1.35;
+  color: #ffc53d;
+}

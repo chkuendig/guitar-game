@@ -6,6 +6,13 @@
     <meta name="theme-color" content="#1c2540" />
     <title>Guitar TPP — Tune · Pluck · Play</title>
     <script>
+      // Production only: the mic needs a secure page, so http:// → https://.
+      // (Vite replaces %PROD%; the dev server on http://paseo:5191 stays put.)
+      if ('%PROD%' === 'true' && location.protocol === 'http:' && !/^(localhost|127\.)/.test(location.hostname)) {
+        location.replace('https:' + location.href.slice(location.protocol.length));
+      }
+    </script>
+    <script>
       // ?play = play-test mode: never connect to Vite's HMR socket, so file
       // edits don't reload the page mid-game. A socket that never opens and
       // never closes keeps the Vite client idle (a closed one makes it reload).
